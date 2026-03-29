@@ -1,0 +1,12 @@
+Flask==3.1.0
+Flask-Cors==5.0.0
+flaskwebgui==1.1.8
+gunicorn==23.0.0
+numpy==2.2.3
+opencv-python-headless==4.11.0.86
+openai>=1.0.0
+pdf2image==1.17.0
+pdfplumber==0.11.5
+pillow==12.1.1
+pytesseract==0.3.13
+reportlab==4.2.5
