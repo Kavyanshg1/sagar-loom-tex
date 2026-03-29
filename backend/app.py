@@ -9,7 +9,6 @@ import sys
 
 from flask import Flask, g, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS
-from flaskwebgui import FlaskUI
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -697,5 +696,17 @@ def serve_frontend(path: str):
 
 
 if __name__ == "__main__":
-    ui = FlaskUI(server="flask", app=app, port=8000, width=1200, height=800, fullscreen=False)
-    ui.run()
+    try:
+        from flaskwebgui import FlaskUI
+
+        ui = FlaskUI(
+            server="flask",
+            app=app,
+            port=8000,
+            width=1200,
+            height=800,
+            fullscreen=False,
+        )
+        ui.run()
+    except ModuleNotFoundError:
+        app.run(debug=False, port=8000)
