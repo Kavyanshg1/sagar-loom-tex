@@ -54,6 +54,9 @@ export function RecordsTable({
 }) {
   const [openMenuRowId, setOpenMenuRowId] = useState(null);
   const containerRef = useRef(null);
+  const primaryColumn = columns[0];
+  const secondaryColumn = columns[1];
+  const detailColumns = columns.slice(2);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -68,7 +71,76 @@ export function RecordsTable({
 
   return (
     <div ref={containerRef} className="overflow-hidden rounded-3xl border border-slate-200">
-      <div className="overflow-x-auto">
+      <div className="divide-y divide-slate-100 bg-white md:hidden">
+        {rows.length === 0 ? (
+          <div className="px-4 py-8 text-center text-sm text-slate-500">{emptyMessage}</div>
+        ) : (
+          rows.map((row) => (
+            <div
+              key={row.id}
+              className={`p-4 transition ${
+                selectedRowIds.includes(row.id)
+                  ? "bg-amber-50/80 ring-1 ring-inset ring-amber-200"
+                  : "bg-white"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-ink">
+                    {primaryColumn?.render
+                      ? primaryColumn.render(row[primaryColumn.key], row)
+                      : row[primaryColumn?.key]}
+                  </div>
+                  {secondaryColumn ? (
+                    <div className="mt-1 text-sm text-slate-500">
+                      <span className="font-semibold text-slate-600">{secondaryColumn.label}:</span>{" "}
+                      {secondaryColumn.render
+                        ? secondaryColumn.render(row[secondaryColumn.key], row)
+                        : row[secondaryColumn.key]}
+                    </div>
+                  ) : null}
+                </div>
+                <ActionsMenu
+                  isOpen={openMenuRowId === row.id}
+                  onToggle={() =>
+                    setOpenMenuRowId((current) => (current === row.id ? null : row.id))
+                  }
+                  onSelect={() => {
+                    onSelectRecord(row);
+                    setOpenMenuRowId(null);
+                  }}
+                  onEdit={() => {
+                    onEditRecord(row);
+                    setOpenMenuRowId(null);
+                  }}
+                  onDelete={() => {
+                    onDeleteRecord(row);
+                    setOpenMenuRowId(null);
+                  }}
+                  selected={selectedRowIds.includes(row.id)}
+                />
+              </div>
+
+              {detailColumns.length > 0 ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {detailColumns.map((column) => (
+                    <div key={`${row.id}-${column.key}`} className="rounded-2xl bg-slate-50 px-3 py-3">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                        {column.label}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-slate-700">
+                        {column.render ? column.render(row[column.key], row) : row[column.key]}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="hidden overflow-x-auto md:block">
         <table className="min-w-full divide-y divide-slate-200 text-sm">
           <thead className="bg-slate-50">
             <tr>
