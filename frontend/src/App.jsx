@@ -11,10 +11,10 @@ import logo from "./assets/logo.png";
 import { api } from "./lib/api";
 
 const tabs = [
-  "Manglam Yarn Agencies",
-  "Shubham Syncotex",
+  "Manglam Yarn Purchases",
+  "Shubham White Yarn",
+  "Shubham Black Yarn",
   "Sai Leela Processors",
-  "Sagar Loom Tex (Direct from Shubham)",
 ];
 
 const exportOptions = [
@@ -44,8 +44,8 @@ const processingColumns = [
 ];
 
 const config = {
-  "Manglam Yarn Agencies": {
-    title: "Manglam Yarn Agencies",
+  "Manglam Yarn Purchases": {
+    title: "Manglam Yarn Purchases",
     endpoint: "createYarnPurchase",
     resourcePath: "/yarn-purchases",
     recordsKey: "yarn_purchases",
@@ -56,30 +56,39 @@ const config = {
     fields: [
       { name: "date", label: "Date", type: "date" },
       { name: "invoice_number", label: "Invoice Number" },
+      {
+        name: "yarn_type",
+        label: "Yarn Type",
+        type: "select",
+        options: [
+          { value: "white", label: "White Yarn" },
+          { value: "black", label: "Black Yarn" },
+        ],
+      },
       { name: "yarn_weight_kg", label: "Yarn Weight (kg)", type: "number" },
       { name: "notes", label: "Notes" },
     ],
     tableColumns: [
       { key: "date", label: "Date" },
       { key: "invoice_number", label: "Invoice #" },
+      { key: "yarn_type", label: "Yarn Type", render: (value) => String(value).toUpperCase() },
       { key: "yarn_weight_kg", label: "Yarn (kg)" },
       { key: "notes", label: "Notes" },
-      { key: "created_at", label: "Logged At" },
     ],
     emptyMessage: "No yarn purchase records yet.",
   },
-  "Shubham Syncotex": {
-    title: "Shubham Syncotex",
+  "Shubham White Yarn": {
+    title: "Shubham Syncotex - White Yarn",
     endpoint: "createProcessingRecord",
     resourcePath: "/processing-records",
     recordsKey: "processing_records",
     documentType: "processing",
-    uploadTitle: "Processing Challan OCR Preview",
+    uploadTitle: "White Processing Challan Preview",
     searchKey: "challan_number",
-    summaryLabel: "Fabric sent to Sai Leela",
+    summaryLabel: "White fabric sent to Sai",
     fields: processingFields,
     tableColumns: processingColumns,
-    emptyMessage: "No processing records yet.",
+    emptyMessage: "No white processing records yet.",
   },
   "Sai Leela Processors": {
     title: "Sai Leela Processors",
@@ -103,24 +112,29 @@ const config = {
     ],
     emptyMessage: "No dyeing records yet.",
   },
-  "Sagar Loom Tex (Direct from Shubham)": {
-    title: "Sagar Loom Tex (Direct from Shubham)",
+  "Shubham Black Yarn": {
+    title: "Shubham Syncotex - Black Yarn",
     endpoint: "createDirectProcessingRecord",
     resourcePath: "/direct-processing-records",
     recordsKey: "direct_processing_records",
     documentType: "processing",
-    uploadTitle: "Direct Transfer Challan OCR Preview",
+    uploadTitle: "Black Processing Challan Preview",
     searchKey: "challan_number",
-    summaryLabel: "Direct fabric received",
+    summaryLabel: "Black fabric sent to Sagar",
     fields: processingFields,
     tableColumns: processingColumns,
-    emptyMessage: "No direct transfer records yet.",
+    emptyMessage: "No black processing records yet.",
   },
 };
 
 const stockFields = [
-  { name: "yarn_kg", label: "Initial Yarn Stock at Shubham (kg)", type: "number" },
-  { name: "fabric_meters", label: "Initial Fabric Stock at Sai Leela (meters)", type: "number" },
+  { name: "white_yarn_kg", label: "Initial White Yarn at Shubham (kg)", type: "number" },
+  { name: "black_yarn_kg", label: "Initial Black Yarn at Shubham (kg)", type: "number" },
+  {
+    name: "white_fabric_meters",
+    label: "Initial White Fabric at Sai Leela (meters)",
+    type: "number",
+  },
 ];
 
 const passwordFields = [
@@ -131,13 +145,14 @@ const passwordFields = [
 function createDefaultValues() {
   const today = new Date().toISOString().slice(0, 10);
   return {
-    "Manglam Yarn Agencies": {
+    "Manglam Yarn Purchases": {
       date: today,
       invoice_number: "",
+      yarn_type: "white",
       yarn_weight_kg: "",
       notes: "",
     },
-    "Shubham Syncotex": {
+    "Shubham White Yarn": {
       date: today,
       challan_number: "",
       yarn_consumed_kg: "",
@@ -150,7 +165,7 @@ function createDefaultValues() {
       challan_number: "",
       fabric_dyed_meters: "",
     },
-    "Sagar Loom Tex (Direct from Shubham)": {
+    "Shubham Black Yarn": {
       date: today,
       challan_number: "",
       yarn_consumed_kg: "",
@@ -220,32 +235,44 @@ export default function App() {
     direct_processing_records: [],
     dyeing_records: [],
     admin: {
-      initial_yarn_stock_kg: 0,
-      initial_fabric_stock_meters: 0,
+      initial_white_yarn_stock_kg: 0,
+      initial_black_yarn_stock_kg: 0,
+      initial_white_fabric_stock_meters: 0,
       password_set: false,
     },
     current_user: null,
     dashboard: {
-      yarn_with_shubham_kg: 0,
-      fabric_with_sai_meters: 0,
+      white_yarn_with_shubham_kg: 0,
+      black_yarn_with_shubham_kg: 0,
+      white_fabric_with_sai_meters: 0,
+      white_fabric_with_sagar_meters: 0,
+      black_fabric_with_sagar_meters: 0,
+      total_fabric_with_sagar_meters: 0,
       logged_fabric_balance_meters: 0,
       fabric_sent_direct_to_sagar_meters: 0,
       shubham_remaining_fabric_meters: 0,
       flow_summary: {
-        manglam: { total_yarn_purchased_kg: 0 },
-        shubham: {
+        manglam: { white_yarn_purchased_kg: 0, black_yarn_purchased_kg: 0 },
+        shubham_white: {
           yarn_balance_kg: 0,
           fabric_produced_meters: 0,
           fabric_sent_to_sai_meters: 0,
-          fabric_sent_direct_meters: 0,
-          remaining_fabric_meters: 0,
+        },
+        shubham_black: {
+          yarn_balance_kg: 0,
+          fabric_produced_meters: 0,
+          fabric_sent_to_sagar_meters: 0,
         },
         sai: {
           fabric_received_meters: 0,
           fabric_dyed_meters: 0,
           balance_meters: 0,
         },
-        sagar: { fabric_received_direct_meters: 0 },
+        sagar: {
+          white_fabric_received_meters: 0,
+          black_fabric_received_meters: 0,
+          total_fabric_received_meters: 0,
+        },
       },
     },
   });
@@ -267,15 +294,16 @@ export default function App() {
   const [sortState, setSortState] = useState(
     Object.fromEntries(tabs.map((tab) => [tab, "desc"])),
   );
-  const [activeFlowNode, setActiveFlowNode] = useState("shubham");
+  const [activeFlowNode, setActiveFlowNode] = useState("shubhamWhite");
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [adminModal, setAdminModal] = useState(null);
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState("");
   const [adminMessage, setAdminMessage] = useState("");
   const [adminForm, setAdminForm] = useState({
-    yarn_kg: "",
-    fabric_meters: "",
+    white_yarn_kg: "",
+    black_yarn_kg: "",
+    white_fabric_meters: "",
     new_password: "",
     confirm_password: "",
     clear_password: "",
@@ -380,17 +408,21 @@ export default function App() {
 
   function getCurrentFormValues(tab = activeTab) {
     const rawValues = formState[tab];
-    if (tab !== "Shubham Syncotex" && tab !== "Sagar Loom Tex (Direct from Shubham)") {
+    if (tab !== "Shubham White Yarn" && tab !== "Shubham Black Yarn") {
       return rawValues;
     }
 
     const yarnConsumed = Number(rawValues.yarn_consumed_kg || 0);
     const wastage = yarnConsumed ? roundToTwo(yarnConsumed * 0.04) : "";
+    const liveBalance =
+      tab === "Shubham White Yarn"
+        ? records.dashboard.white_yarn_with_shubham_kg
+        : records.dashboard.black_yarn_with_shubham_kg;
     const baseYarnBalance =
       editingRecordId && rawValues.yarn_balance_kg !== ""
         ? rawValues.yarn_balance_kg
         : yarnConsumed
-          ? roundToTwo(records.dashboard.yarn_with_shubham_kg - yarnConsumed - Number(wastage || 0))
+          ? roundToTwo(liveBalance - yarnConsumed - Number(wastage || 0))
           : "";
 
     return {
@@ -579,8 +611,9 @@ export default function App() {
     if (type === "stock") {
       setAdminForm((current) => ({
         ...current,
-        yarn_kg: String(records.admin?.initial_yarn_stock_kg ?? 0),
-        fabric_meters: String(records.admin?.initial_fabric_stock_meters ?? 0),
+        white_yarn_kg: String(records.admin?.initial_white_yarn_stock_kg ?? 0),
+        black_yarn_kg: String(records.admin?.initial_black_yarn_stock_kg ?? 0),
+        white_fabric_meters: String(records.admin?.initial_white_fabric_stock_meters ?? 0),
       }));
     }
     if (type === "password") {
@@ -768,8 +801,9 @@ export default function App() {
 
     try {
       await api.setInitialStock({
-        yarn_kg: Number(adminForm.yarn_kg || 0),
-        fabric_meters: Number(adminForm.fabric_meters || 0),
+        white_yarn_kg: Number(adminForm.white_yarn_kg || 0),
+        black_yarn_kg: Number(adminForm.black_yarn_kg || 0),
+        white_fabric_meters: Number(adminForm.white_fabric_meters || 0),
       });
       await loadRecords();
       setAdminMessage("Starting stock updated successfully.");
@@ -853,36 +887,41 @@ export default function App() {
   }
 
   const autoInsightMap = {
-    "Manglam Yarn Agencies":
-      "Every yarn purchase immediately increases the live yarn balance at Shubham Syncotex.",
-    "Shubham Syncotex":
-      "These records represent Shubham fabric routed to Sai Leela. Wastage stays at 4%, and yarn balance is shared across both Shubham outflows.",
+    "Manglam Yarn Purchases":
+      "Record black and white yarn separately so both Shubham stocks stay independent from purchase to output.",
+    "Shubham White Yarn":
+      "White yarn at Shubham converts into unfinished white fabric, which then moves onward to Sai Leela for dyeing.",
+    "Shubham Black Yarn":
+      "Black yarn at Shubham stays on a direct path to Sagar Loom Tex, with its own yarn balance and challan history.",
     "Sai Leela Processors":
-      "Sai Leela receives unfinished fabric from Shubham processing records only, while balance is total received minus dyed meters.",
-    "Sagar Loom Tex (Direct from Shubham)":
-      "Direct challans mirror Shubham processing fields and draw from the same yarn balance while routing fabric straight to Sagar Loom Tex.",
+      "Sai Leela handles only the white-fabric branch. Balance is white fabric received from Shubham minus total dyed meters.",
   };
 
   const flowSummary = records.dashboard.flow_summary;
   const flowNodeDetails = {
     manglam: [
-      `Total yarn purchased: ${formatMetric(flowSummary.manglam.total_yarn_purchased_kg, "kg")}`,
+      `White yarn purchased: ${formatMetric(flowSummary.manglam.white_yarn_purchased_kg, "kg")}`,
+      `Black yarn purchased: ${formatMetric(flowSummary.manglam.black_yarn_purchased_kg, "kg")}`,
     ],
-    shubham: [
-      `Yarn balance: ${formatMetric(flowSummary.shubham.yarn_balance_kg, "kg")}`,
-      `Fabric produced: ${formatMetric(flowSummary.shubham.fabric_produced_meters, "m")}`,
-      `Remaining balance: ${formatMetric(flowSummary.shubham.remaining_fabric_meters, "m")}`,
+    shubhamWhite: [
+      `White yarn balance: ${formatMetric(flowSummary.shubham_white.yarn_balance_kg, "kg")}`,
+      `White fabric produced: ${formatMetric(flowSummary.shubham_white.fabric_produced_meters, "m")}`,
+      `Sent to Sai Leela: ${formatMetric(flowSummary.shubham_white.fabric_sent_to_sai_meters, "m")}`,
+    ],
+    shubhamBlack: [
+      `Black yarn balance: ${formatMetric(flowSummary.shubham_black.yarn_balance_kg, "kg")}`,
+      `Black fabric produced: ${formatMetric(flowSummary.shubham_black.fabric_produced_meters, "m")}`,
+      `Sent directly to Sagar: ${formatMetric(flowSummary.shubham_black.fabric_sent_to_sagar_meters, "m")}`,
     ],
     sai: [
-      `Fabric received: ${formatMetric(flowSummary.sai.fabric_received_meters, "m")}`,
-      `Fabric dyed: ${formatMetric(flowSummary.sai.fabric_dyed_meters, "m")}`,
-      `Balance: ${formatMetric(flowSummary.sai.balance_meters, "m")}`,
+      `White fabric received: ${formatMetric(flowSummary.sai.fabric_received_meters, "m")}`,
+      `White fabric dyed: ${formatMetric(flowSummary.sai.fabric_dyed_meters, "m")}`,
+      `White fabric balance: ${formatMetric(flowSummary.sai.balance_meters, "m")}`,
     ],
     sagar: [
-      `Fabric received directly: ${formatMetric(
-        flowSummary.sagar.fabric_received_direct_meters,
-        "m",
-      )}`,
+      `White fabric received from Sai: ${formatMetric(flowSummary.sagar.white_fabric_received_meters, "m")}`,
+      `Black fabric received direct: ${formatMetric(flowSummary.sagar.black_fabric_received_meters, "m")}`,
+      `Total fabric received: ${formatMetric(flowSummary.sagar.total_fabric_received_meters, "m")}`,
     ],
   };
 
@@ -970,8 +1009,9 @@ export default function App() {
               <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur sm:rounded-[28px] sm:p-5">
                 <div className="text-sm font-semibold text-slate-200">Live production note</div>
                 <div className="mt-3 text-sm leading-6 text-slate-300">
-                  Shubham Syncotex can now route fabric to Sai Leela Processors or directly to
-                  Sagar Loom Tex while sharing one yarn balance ledger.
+                  The app is now split into two cleaner branches: white yarn flows through Sai
+                  Leela before reaching Sagar, while black yarn moves from Shubham directly to
+                  Sagar with its own stock ledger.
                 </div>
               </div>
             </div>
@@ -984,23 +1024,29 @@ export default function App() {
           </div>
         ) : null}
 
-        <section className="mt-6 grid gap-4 md:grid-cols-3">
+        <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
-            label="Shubham Yarn Balance"
-            value={formatMetric(records.dashboard.yarn_with_shubham_kg, "kg")}
-            subtitle="Shared yarn position after both Sai and direct Shubham processing records."
+            label="Shubham White Yarn"
+            value={formatMetric(records.dashboard.white_yarn_with_shubham_kg, "kg")}
+            subtitle="Live white-yarn stock available for the Sai Leela branch."
             accent="bg-sand text-ember"
           />
           <StatCard
-            label="Sai Fabric Balance"
-            value={formatMetric(records.dashboard.fabric_with_sai_meters, "m")}
-            subtitle="Fabric routed to Sai Leela minus total dyed meters."
+            label="Shubham Black Yarn"
+            value={formatMetric(records.dashboard.black_yarn_with_shubham_kg, "kg")}
+            subtitle="Live black-yarn stock available for direct Sagar production."
+            accent="bg-slate-200 text-slate-800"
+          />
+          <StatCard
+            label="Sai White Fabric"
+            value={formatMetric(records.dashboard.white_fabric_with_sai_meters, "m")}
+            subtitle="White fabric currently available at Sai Leela after dyeing."
             accent="bg-teal-100 text-ocean"
           />
           <StatCard
-            label="Direct To Sagar"
-            value={formatMetric(records.dashboard.fabric_sent_direct_to_sagar_meters, "m")}
-            subtitle="Fabric transferred directly from Shubham Syncotex to Sagar Loom Tex."
+            label="Fabric With Sagar"
+            value={formatMetric(records.dashboard.total_fabric_with_sagar_meters, "m")}
+            subtitle="Combined white dyed fabric and black direct fabric already with Sagar."
             accent="bg-orange-100 text-ember"
           />
         </section>
@@ -1117,13 +1163,13 @@ export default function App() {
               <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 {currentConfig.summaryLabel}:{" "}
                 <span className="font-bold text-ink">
-                  {activeTab === "Manglam Yarn Agencies"
-                    ? formatMetric(flowSummary.manglam.total_yarn_purchased_kg, "kg")
-                    : activeTab === "Shubham Syncotex"
-                      ? formatMetric(flowSummary.shubham.fabric_sent_to_sai_meters, "m")
-                      : activeTab === "Sai Leela Processors"
-                        ? formatMetric(flowSummary.sai.balance_meters, "m")
-                        : formatMetric(flowSummary.sagar.fabric_received_direct_meters, "m")}
+                  {activeTab === "Manglam Yarn Purchases"
+                    ? `${formatMetric(flowSummary.manglam.white_yarn_purchased_kg, "kg")} white / ${formatMetric(flowSummary.manglam.black_yarn_purchased_kg, "kg")} black`
+                    : activeTab === "Shubham White Yarn"
+                      ? formatMetric(flowSummary.shubham_white.fabric_sent_to_sai_meters, "m")
+                      : activeTab === "Shubham Black Yarn"
+                        ? formatMetric(flowSummary.shubham_black.fabric_sent_to_sagar_meters, "m")
+                        : formatMetric(flowSummary.sai.balance_meters, "m")}
                 </span>
               </div>
             </div>
@@ -1199,15 +1245,15 @@ export default function App() {
               </p>
             </div>
 
-            <div className="rounded-3xl bg-peach p-5">
-              <div className="text-sm font-bold uppercase tracking-[0.24em] text-ember">
-                Manual entry
-              </div>
-              <p className="mt-2 text-sm text-slate-600">
-                Open the modal form, edit existing records, and keep balances synced across both
-                Shubham outflows.
-              </p>
-              <button
+              <div className="rounded-3xl bg-peach p-5">
+                <div className="text-sm font-bold uppercase tracking-[0.24em] text-ember">
+                  Manual entry
+                </div>
+                <p className="mt-2 text-sm text-slate-600">
+                  Open the modal form, capture the correct branch, and keep black and white stock
+                  ledgers synced without relying on document upload.
+                </p>
+                <button
                 type="button"
                 onClick={openCreateModal}
                 className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-ink shadow-sm"
@@ -1232,55 +1278,55 @@ export default function App() {
 
         <section className="mt-6">
           <SectionCard>
-            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3">
               <div>
                 <h3 className="text-2xl font-bold text-ink">Production Flow</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Click any node to inspect live movement totals across Manglam Yarn Agencies,
-                  Shubham Syncotex, Sai Leela Processors, and direct transfer to Sagar Loom Tex.
+                  Click any node to inspect the simplified white-yarn and black-yarn routes from
+                  purchase to final receipt at Sagar Loom Tex.
                 </p>
               </div>
 
-              <div className="mt-4 grid gap-4 lg:grid-cols-[1fr,80px,1fr]">
+              <div className="mt-4 grid gap-4 lg:grid-cols-[1fr,1fr]">
                 <div className="flex flex-col items-center gap-4">
                   <FlowNode
                     active={activeFlowNode === "manglam"}
                     label="Manglam Yarn Agencies"
-                    subtitle="Yarn purchased"
+                    subtitle="Black and white yarn purchased"
                     onClick={() => setActiveFlowNode("manglam")}
+                  />
+                  <div className="text-3xl text-slate-300">↙</div>
+                  <FlowNode
+                    active={activeFlowNode === "shubhamWhite"}
+                    label="Shubham White Yarn"
+                    subtitle="White yarn converted for Sai Leela"
+                    onClick={() => setActiveFlowNode("shubhamWhite")}
                   />
                   <div className="text-3xl text-slate-300">↓</div>
                   <FlowNode
-                    active={activeFlowNode === "shubham"}
-                    label="Shubham Syncotex"
-                    subtitle="Shared yarn and fabric hub"
-                    onClick={() => setActiveFlowNode("shubham")}
-                  />
-                </div>
-
-                <div className="hidden items-center justify-center text-5xl text-slate-300 lg:flex">
-                  ↙ ↘
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                  <FlowNode
                     active={activeFlowNode === "sai"}
                     label="Sai Leela Processors"
-                    subtitle="Fabric routed for dyeing"
+                    subtitle="White fabric dyeing branch"
                     onClick={() => setActiveFlowNode("sai")}
                   />
+                </div>
+
+                <div className="flex flex-col items-center gap-4">
+                  <div className="hidden text-3xl text-slate-300 lg:block">↘</div>
+                  <FlowNode
+                    active={activeFlowNode === "shubhamBlack"}
+                    label="Shubham Black Yarn"
+                    subtitle="Black yarn converted direct to Sagar"
+                    onClick={() => setActiveFlowNode("shubhamBlack")}
+                  />
+                  <div className="text-3xl text-slate-300">↓</div>
                   <FlowNode
                     active={activeFlowNode === "sagar"}
                     label="Sagar Loom Tex"
-                    subtitle="Direct transfer from Shubham"
+                    subtitle="Receives dyed white + direct black fabric"
                     onClick={() => setActiveFlowNode("sagar")}
                   />
                 </div>
-              </div>
-
-              <div className="flex items-center justify-center gap-6 py-2 text-3xl text-slate-300 lg:hidden">
-                <span>↙</span>
-                <span>↘</span>
               </div>
 
               <div className="mt-4 rounded-[28px] border border-slate-200 bg-slate-50 p-5">
@@ -1368,16 +1414,16 @@ export default function App() {
           submitLabel={editingRecordId ? "Update Record" : "Save Record"}
           loading={saving}
         >
-          {(activeTab === "Shubham Syncotex" ||
-            activeTab === "Sagar Loom Tex (Direct from Shubham)") ? (
+          {(activeTab === "Shubham White Yarn" || activeTab === "Shubham Black Yarn") ? (
             <div className="rounded-3xl bg-slate-50 p-4 text-sm text-slate-600">
-              Wastage is calculated at 4% of yarn consumed, and yarn balance is recomputed across
-              both Shubham transfer routes on save.
+              Wastage is calculated at 4% of yarn consumed. Each Shubham branch recomputes against
+              its own yarn stock on save, so white and black balances stay independent.
             </div>
           ) : null}
           {activeTab === "Sai Leela Processors" ? (
             <div className="rounded-3xl bg-slate-50 p-4 text-sm text-slate-600">
-              Sai Leela balance is based only on fabric routed through Shubham processing records.
+              Sai Leela handles only the white branch. Balance is based on white fabric received
+              from Shubham White Yarn records minus dyed meters.
             </div>
           ) : null}
           {error ? <p className="text-sm text-ember">{error}</p> : null}

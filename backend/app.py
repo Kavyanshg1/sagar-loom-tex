@@ -24,6 +24,8 @@ from services import (
     add_processing_record,
     add_yarn_purchase,
     calculate_fabric_balance,
+    calculate_black_yarn_balance,
+    calculate_white_yarn_balance,
     calculate_yarn_balance,
     clear_all_data,
     create_user,
@@ -38,6 +40,7 @@ from services import (
     get_dashboard,
     is_password_set,
     set_initial_stock,
+    set_initial_stock_by_type,
     set_password,
     serialize_rows,
     serialize_user,
@@ -290,16 +293,16 @@ def export_pdf():
     story.append(
         create_report_table(
             format_table_data(
-                ["Date", "Invoice Number", "Yarn Weight (kg)", "Notes"],
+                ["Date", "Invoice Number", "Yarn Type", "Yarn Weight (kg)", "Notes"],
                 report_data["yarn_purchases"],
-                ["date", "invoice_number", "yarn_weight_kg", "notes"],
+                ["date", "invoice_number", "yarn_type", "yarn_weight_kg", "notes"],
             ),
-            [1.1 * inch, 1.45 * inch, 1.45 * inch, 3.0 * inch],
+            [0.95 * inch, 1.2 * inch, 0.9 * inch, 1.2 * inch, 2.65 * inch],
         )
     )
     story.append(Spacer(1, 18))
 
-    story.append(Paragraph("2. Processing Records (Shubham Syncotex)", section_style))
+    story.append(Paragraph("2. Shubham White Yarn (To Sai Leela)", section_style))
     story.append(
         create_report_table(
             format_table_data(
@@ -324,7 +327,32 @@ def export_pdf():
     )
     story.append(Spacer(1, 18))
 
-    story.append(Paragraph("3. Dyeing Records (Sai Leela Processors)", section_style))
+    story.append(Paragraph("3. Shubham Black Yarn (Direct To Sagar Loom Tex)", section_style))
+    story.append(
+        create_report_table(
+            format_table_data(
+                [
+                    "Date",
+                    "Challan Number",
+                    "Yarn Consumed (kg)",
+                    "Wastage (kg)",
+                    "Fabric Produced (meters)",
+                ],
+                report_data["direct_processing_records"],
+                [
+                    "date",
+                    "challan_number",
+                    "yarn_consumed_kg",
+                    "wastage_kg",
+                    "fabric_produced_meters",
+                ],
+            ),
+            [0.9 * inch, 1.2 * inch, 1.2 * inch, 1.0 * inch, 1.9 * inch],
+        )
+    )
+    story.append(Spacer(1, 18))
+
+    story.append(Paragraph("4. Dyeing Records (Sai Leela Processors)", section_style))
     story.append(
         create_report_table(
             format_table_data(
@@ -352,7 +380,7 @@ def export_pdf():
 def create_yarn_purchase():
     payload = request.get_json(force=True, silent=True) or {}
     validation_error = required_fields(
-        payload, ["date", "invoice_number", "yarn_weight_kg"]
+        payload, ["date", "invoice_number", "yarn_type", "yarn_weight_kg"]
     )
     if validation_error:
         return error(validation_error)
@@ -366,7 +394,7 @@ def create_yarn_purchase():
 def edit_yarn_purchase(record_id: int):
     payload = request.get_json(force=True, silent=True) or {}
     validation_error = required_fields(
-        payload, ["date", "invoice_number", "yarn_weight_kg"]
+        payload, ["date", "invoice_number", "yarn_type", "yarn_weight_kg"]
     )
     if validation_error:
         return error(validation_error)
@@ -404,8 +432,8 @@ def create_processing_record():
 
     yarn_consumed = float(payload["yarn_consumed_kg"])
     total_draw = round(yarn_consumed + (yarn_consumed * WASTAGE_RATE), 2)
-    if total_draw > calculate_yarn_balance():
-        return error("Processing entry exceeds available yarn balance at Shubham Syncotex.")
+    if total_draw > calculate_white_yarn_balance():
+        return error("White processing entry exceeds available white yarn balance at Shubham Syncotex.")
 
     record = add_processing_record(payload)
     return jsonify(
@@ -442,8 +470,8 @@ def create_direct_processing_record():
 
     yarn_consumed = float(payload["yarn_consumed_kg"])
     total_draw = round(yarn_consumed + (yarn_consumed * WASTAGE_RATE), 2)
-    if total_draw > calculate_yarn_balance():
-        return error("Direct processing entry exceeds available yarn balance at Shubham Syncotex.")
+    if total_draw > calculate_black_yarn_balance():
+        return error("Black processing entry exceeds available black yarn balance at Shubham Syncotex.")
 
     record = add_direct_processing_record(payload)
     return jsonify(
@@ -638,20 +666,22 @@ def update_password():
 @auth_required(admin_only=True)
 def update_initial_stock():
     payload = request.get_json(force=True, silent=True) or {}
-    validation_error = required_fields(payload, ["yarn_kg", "fabric_meters"])
-    if validation_error:
-        return error(validation_error)
 
     try:
-        yarn_kg = round(float(payload["yarn_kg"]), 2)
-        fabric_meters = round(float(payload["fabric_meters"]), 2)
+        white_yarn_kg = round(
+            float(payload.get("white_yarn_kg", payload.get("yarn_kg", 0))), 2
+        )
+        black_yarn_kg = round(float(payload.get("black_yarn_kg", 0)), 2)
+        white_fabric_meters = round(
+            float(payload.get("white_fabric_meters", payload.get("fabric_meters", 0))), 2
+        )
     except (TypeError, ValueError):
         return error("Initial stock values must be numeric.")
 
-    if yarn_kg < 0 or fabric_meters < 0:
+    if white_yarn_kg < 0 or black_yarn_kg < 0 or white_fabric_meters < 0:
         return error("Initial stock values must be zero or positive.")
 
-    set_initial_stock(yarn_kg, fabric_meters)
+    set_initial_stock_by_type(white_yarn_kg, black_yarn_kg, white_fabric_meters)
     return jsonify(
         {
             "success": True,

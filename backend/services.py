@@ -68,7 +68,11 @@ def get_filtered_records(
     where_clause, params, range_label = build_date_filters(range_type, start_date, end_date)
 
     yarn_purchases = serialize_rows(
-        f"SELECT date, invoice_number, yarn_weight_kg, notes FROM yarn_purchases{where_clause} ORDER BY date ASC, id ASC",
+        f"""
+        SELECT date, invoice_number, yarn_type, yarn_weight_kg, notes
+        FROM yarn_purchases{where_clause}
+        ORDER BY date ASC, id ASC
+        """,
         params,
     )
     processing_records = serialize_rows(
@@ -138,6 +142,22 @@ def fetch_config_number(connection, key: str) -> float:
         return 0.0
 
 
+def parse_config_number(raw_value: str | None, default: float = 0.0) -> float:
+    try:
+        return round(float(raw_value), 2)
+    except (TypeError, ValueError):
+        return default
+
+
+def resolve_stock_value(connection, primary_key: str, fallback_key: str | None = None) -> float:
+    primary_value = fetch_config_value(connection, primary_key, "")
+    if primary_value != "":
+        return parse_config_number(primary_value)
+    if fallback_key:
+        return parse_config_number(fetch_config_value(connection, fallback_key, "0"))
+    return 0.0
+
+
 def normalize_yarn_type(raw_value: str | None) -> str:
     yarn_type = str(raw_value or WHITE_YARN).strip().lower()
     if yarn_type not in YARN_TYPES:
@@ -158,10 +178,17 @@ def upsert_config_value(connection, key: str, value: str) -> None:
 
 def get_initial_stock() -> dict[str, float]:
     with get_connection() as connection:
-        return {
-            "yarn_kg": fetch_config_number(connection, INITIAL_YARN_KEY),
-            "fabric_meters": fetch_config_number(connection, INITIAL_FABRIC_KEY),
-        }
+        white_yarn = resolve_stock_value(connection, INITIAL_WHITE_YARN_KEY, LEGACY_INITIAL_YARN_KEY)
+        black_yarn = resolve_stock_value(connection, INITIAL_BLACK_YARN_KEY)
+        white_fabric = resolve_stock_value(
+            connection, INITIAL_WHITE_FABRIC_KEY, LEGACY_INITIAL_FABRIC_KEY
+        )
+
+    return {
+        "white_yarn_kg": white_yarn,
+        "black_yarn_kg": black_yarn,
+        "white_fabric_meters": white_fabric,
+    }
 
 
 def is_password_set() -> bool:
@@ -172,8 +199,9 @@ def is_password_set() -> bool:
 def get_admin_settings() -> dict[str, Any]:
     initial_stock = get_initial_stock()
     return {
-        "initial_yarn_stock_kg": initial_stock["yarn_kg"],
-        "initial_fabric_stock_meters": initial_stock["fabric_meters"],
+        "initial_white_yarn_stock_kg": initial_stock["white_yarn_kg"],
+        "initial_black_yarn_stock_kg": initial_stock["black_yarn_kg"],
+        "initial_white_fabric_stock_meters": initial_stock["white_fabric_meters"],
         "password_set": is_password_set(),
     }
 
@@ -272,37 +300,49 @@ def verify_password(input_password: str) -> bool:
     return hmac.compare_digest(stored_hash, legacy_hash)
 
 
-def fetch_total_yarn_purchased(connection) -> float:
-    row = connection.execute(
-        "SELECT COALESCE(SUM(yarn_weight_kg), 0) FROM yarn_purchases"
-    ).fetchone()
+def fetch_total_yarn_purchased(connection, yarn_type: str | None = None) -> float:
+    if yarn_type:
+        row = connection.execute(
+            "SELECT COALESCE(SUM(yarn_weight_kg), 0) FROM yarn_purchases WHERE yarn_type = ?",
+            (yarn_type,),
+        ).fetchone()
+    else:
+        row = connection.execute(
+            "SELECT COALESCE(SUM(yarn_weight_kg), 0) FROM yarn_purchases"
+        ).fetchone()
     return round(float(row[0] or 0), 2)
 
 
-def fetch_total_yarn_draw(connection) -> float:
-    row = connection.execute(
-        """
-        SELECT
-            COALESCE((SELECT SUM(yarn_consumed_kg + wastage_kg) FROM processing_records), 0)
-            +
-            COALESCE((SELECT SUM(yarn_consumed_kg + wastage_kg) FROM direct_processing_records), 0)
-        """
-    ).fetchone()
+def fetch_total_yarn_draw(connection, yarn_type: str | None = None) -> float:
+    if yarn_type == WHITE_YARN:
+        row = connection.execute(
+            "SELECT COALESCE(SUM(yarn_consumed_kg + wastage_kg), 0) FROM processing_records"
+        ).fetchone()
+    elif yarn_type == BLACK_YARN:
+        row = connection.execute(
+            "SELECT COALESCE(SUM(yarn_consumed_kg + wastage_kg), 0) FROM direct_processing_records"
+        ).fetchone()
+    else:
+        row = connection.execute(
+            """
+            SELECT
+                COALESCE((SELECT SUM(yarn_consumed_kg + wastage_kg) FROM processing_records), 0)
+                +
+                COALESCE((SELECT SUM(yarn_consumed_kg + wastage_kg) FROM direct_processing_records), 0)
+            """
+        ).fetchone()
     return round(float(row[0] or 0), 2)
 
 
-def fetch_total_processing_fabric(connection) -> float:
+def fetch_total_processing_fabric(connection, table_name: str = "processing_records") -> float:
     row = connection.execute(
-        "SELECT COALESCE(SUM(fabric_produced_meters), 0) FROM processing_records"
+        f"SELECT COALESCE(SUM(fabric_produced_meters), 0) FROM {table_name}"
     ).fetchone()
     return round(float(row[0] or 0), 2)
 
 
 def fetch_total_direct_fabric(connection) -> float:
-    row = connection.execute(
-        "SELECT COALESCE(SUM(fabric_produced_meters), 0) FROM direct_processing_records"
-    ).fetchone()
-    return round(float(row[0] or 0), 2)
+    return fetch_total_processing_fabric(connection, "direct_processing_records")
 
 
 def fetch_total_fabric_dyed(connection) -> float:
@@ -314,6 +354,13 @@ def fetch_total_fabric_dyed(connection) -> float:
 
 def calculate_total_yarn_purchased() -> float:
     return fetch_scalar("SELECT COALESCE(SUM(yarn_weight_kg), 0) FROM yarn_purchases")
+
+
+def calculate_yarn_purchased_by_type(yarn_type: str) -> float:
+    return fetch_scalar(
+        "SELECT COALESCE(SUM(yarn_weight_kg), 0) FROM yarn_purchases WHERE yarn_type = ?",
+        (yarn_type,),
+    )
 
 
 def calculate_processing_fabric_sent_to_sai() -> float:
@@ -336,22 +383,30 @@ def calculate_total_fabric_dyed() -> float:
     return fetch_scalar("SELECT COALESCE(SUM(fabric_dyed_meters), 0) FROM dyeing_records")
 
 
-def calculate_yarn_balance() -> float:
-    initial_yarn = get_initial_stock()["yarn_kg"]
-    purchased = calculate_total_yarn_purchased()
+def calculate_white_yarn_balance() -> float:
+    initial_white = get_initial_stock()["white_yarn_kg"]
+    purchased = calculate_yarn_purchased_by_type(WHITE_YARN)
     draw = fetch_scalar(
-        """
-        SELECT
-            COALESCE((SELECT SUM(yarn_consumed_kg + wastage_kg) FROM processing_records), 0)
-            +
-            COALESCE((SELECT SUM(yarn_consumed_kg + wastage_kg) FROM direct_processing_records), 0)
-        """
+        "SELECT COALESCE(SUM(yarn_consumed_kg + wastage_kg), 0) FROM processing_records"
     )
-    return round(initial_yarn + purchased - draw, 2)
+    return round(initial_white + purchased - draw, 2)
+
+
+def calculate_black_yarn_balance() -> float:
+    initial_black = get_initial_stock()["black_yarn_kg"]
+    purchased = calculate_yarn_purchased_by_type(BLACK_YARN)
+    draw = fetch_scalar(
+        "SELECT COALESCE(SUM(yarn_consumed_kg + wastage_kg), 0) FROM direct_processing_records"
+    )
+    return round(initial_black + purchased - draw, 2)
+
+
+def calculate_yarn_balance() -> float:
+    return round(calculate_white_yarn_balance() + calculate_black_yarn_balance(), 2)
 
 
 def calculate_fabric_balance() -> float:
-    initial_fabric = get_initial_stock()["fabric_meters"]
+    initial_fabric = get_initial_stock()["white_fabric_meters"]
     produced_for_sai = calculate_processing_fabric_sent_to_sai()
     dyed = calculate_total_fabric_dyed()
     return round(initial_fabric + produced_for_sai - dyed, 2)
@@ -369,77 +424,91 @@ def calculate_shubham_remaining_fabric() -> float:
 
 
 def get_flow_summary() -> dict[str, dict[str, float]]:
+    white_to_sai = calculate_processing_fabric_sent_to_sai()
+    black_to_sagar = calculate_direct_fabric_sent_to_sagar()
+    dyed_white = calculate_total_fabric_dyed()
     return {
         "manglam": {
-            "total_yarn_purchased_kg": calculate_total_yarn_purchased(),
+            "white_yarn_purchased_kg": calculate_yarn_purchased_by_type(WHITE_YARN),
+            "black_yarn_purchased_kg": calculate_yarn_purchased_by_type(BLACK_YARN),
         },
-        "shubham": {
-            "yarn_balance_kg": calculate_yarn_balance(),
-            "fabric_produced_meters": calculate_total_shubham_fabric_produced(),
-            "fabric_sent_to_sai_meters": calculate_processing_fabric_sent_to_sai(),
-            "fabric_sent_direct_meters": calculate_direct_fabric_sent_to_sagar(),
-            "remaining_fabric_meters": calculate_shubham_remaining_fabric(),
+        "shubham_white": {
+            "yarn_balance_kg": calculate_white_yarn_balance(),
+            "fabric_produced_meters": white_to_sai,
+            "fabric_sent_to_sai_meters": white_to_sai,
+        },
+        "shubham_black": {
+            "yarn_balance_kg": calculate_black_yarn_balance(),
+            "fabric_produced_meters": black_to_sagar,
+            "fabric_sent_to_sagar_meters": black_to_sagar,
         },
         "sai": {
-            "fabric_received_meters": round(
-                get_initial_stock()["fabric_meters"] + calculate_processing_fabric_sent_to_sai(),
-                2,
-            ),
-            "fabric_dyed_meters": calculate_total_fabric_dyed(),
+            "fabric_received_meters": round(get_initial_stock()["white_fabric_meters"] + white_to_sai, 2),
+            "fabric_dyed_meters": dyed_white,
             "balance_meters": calculate_fabric_balance(),
         },
         "sagar": {
-            "fabric_received_direct_meters": calculate_direct_fabric_sent_to_sagar(),
+            "white_fabric_received_meters": dyed_white,
+            "black_fabric_received_meters": black_to_sagar,
+            "total_fabric_received_meters": round(dyed_white + black_to_sagar, 2),
         },
     }
 
 
 def get_dashboard() -> dict[str, Any]:
     initial_stock = get_initial_stock()
+    flow_summary = get_flow_summary()
     return {
+        "white_yarn_with_shubham_kg": calculate_white_yarn_balance(),
+        "black_yarn_with_shubham_kg": calculate_black_yarn_balance(),
+        "white_fabric_with_sai_meters": calculate_fabric_balance(),
+        "white_fabric_with_sagar_meters": flow_summary["sagar"]["white_fabric_received_meters"],
+        "black_fabric_with_sagar_meters": calculate_direct_fabric_sent_to_sagar(),
+        "total_fabric_with_sagar_meters": flow_summary["sagar"]["total_fabric_received_meters"],
         "yarn_with_shubham_kg": calculate_yarn_balance(),
         "fabric_with_sai_meters": calculate_fabric_balance(),
         "logged_fabric_balance_meters": calculate_received_balance(),
         "fabric_sent_direct_to_sagar_meters": calculate_direct_fabric_sent_to_sagar(),
         "shubham_remaining_fabric_meters": calculate_shubham_remaining_fabric(),
-        "initial_yarn_stock_kg": initial_stock["yarn_kg"],
-        "initial_fabric_stock_meters": initial_stock["fabric_meters"],
-        "flow_summary": get_flow_summary(),
+        "initial_white_yarn_stock_kg": initial_stock["white_yarn_kg"],
+        "initial_black_yarn_stock_kg": initial_stock["black_yarn_kg"],
+        "initial_white_fabric_stock_meters": initial_stock["white_fabric_meters"],
+        "flow_summary": flow_summary,
     }
 
 
 def recompute_processing_balances(connection) -> None:
-    total_purchased = fetch_total_yarn_purchased(connection) + fetch_config_number(
-        connection, INITIAL_YARN_KEY
+    balance_groups = (
+        ("processing_records", WHITE_YARN, INITIAL_WHITE_YARN_KEY, LEGACY_INITIAL_YARN_KEY),
+        ("direct_processing_records", BLACK_YARN, INITIAL_BLACK_YARN_KEY, None),
     )
-    rows = connection.execute(
-        """
-        SELECT source_table, id, yarn_consumed_kg, wastage_kg
-        FROM (
-            SELECT 'processing_records' AS source_table, id, date, created_at, yarn_consumed_kg, wastage_kg
-            FROM processing_records
-            UNION ALL
-            SELECT 'direct_processing_records' AS source_table, id, date, created_at, yarn_consumed_kg, wastage_kg
-            FROM direct_processing_records
-        )
-        ORDER BY date ASC, created_at ASC, source_table ASC, id ASC
-        """
-    ).fetchall()
 
-    remaining = total_purchased
-    for row in rows:
-        remaining = round(
-            remaining - float(row["yarn_consumed_kg"]) - float(row["wastage_kg"]), 2
-        )
-        connection.execute(
-            f"UPDATE {row['source_table']} SET yarn_balance_kg = ? WHERE id = ?",
-            (remaining, row["id"]),
-        )
+    for table_name, yarn_type, config_key, fallback_key in balance_groups:
+        opening_stock = resolve_stock_value(connection, config_key, fallback_key)
+
+        remaining = round(opening_stock + fetch_total_yarn_purchased(connection, yarn_type), 2)
+        rows = connection.execute(
+            f"""
+            SELECT id, yarn_consumed_kg, wastage_kg
+            FROM {table_name}
+            ORDER BY date ASC, created_at ASC, id ASC
+            """
+        ).fetchall()
+
+        for row in rows:
+            remaining = round(
+                remaining - float(row["yarn_consumed_kg"]) - float(row["wastage_kg"]), 2
+            )
+            connection.execute(
+                f"UPDATE {table_name} SET yarn_balance_kg = ? WHERE id = ?",
+                (remaining, row["id"]),
+            )
 
 
 def recompute_dyeing_balances(connection) -> None:
-    total_produced = fetch_total_processing_fabric(connection) + fetch_config_number(
-        connection, INITIAL_FABRIC_KEY
+    total_produced = fetch_total_processing_fabric(connection) + (
+        fetch_config_number(connection, INITIAL_WHITE_FABRIC_KEY)
+        or fetch_config_number(connection, LEGACY_INITIAL_FABRIC_KEY)
     )
 
     rows = connection.execute(
@@ -461,15 +530,17 @@ def recompute_dyeing_balances(connection) -> None:
 
 
 def add_yarn_purchase(payload: dict[str, Any]) -> dict[str, Any]:
+    yarn_type = normalize_yarn_type(payload.get("yarn_type"))
     with get_connection() as connection:
         cursor = connection.execute(
             """
-            INSERT INTO yarn_purchases (date, invoice_number, yarn_weight_kg, notes)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO yarn_purchases (date, invoice_number, yarn_type, yarn_weight_kg, notes)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (
                 payload["date"],
                 payload["invoice_number"],
+                yarn_type,
                 float(payload["yarn_weight_kg"]),
                 payload.get("notes", ""),
             ),
@@ -551,22 +622,35 @@ def update_yarn_purchase(record_id: int, payload: dict[str, Any]) -> dict[str, A
         raise ValueError("Record not found.")
 
     new_weight = round(float(payload["yarn_weight_kg"]), 2)
+    new_yarn_type = normalize_yarn_type(payload.get("yarn_type"))
 
     with get_connection() as connection:
-        current_total = fetch_total_yarn_purchased(connection)
-        projected_total = round(current_total - float(existing["yarn_weight_kg"]) + new_weight, 2)
-        if projected_total < fetch_total_yarn_draw(connection):
+        existing_type = normalize_yarn_type(existing.get("yarn_type"))
+        current_total = fetch_total_yarn_purchased(connection, new_yarn_type)
+        adjusted_total = current_total + new_weight
+        if existing_type == new_yarn_type:
+            adjusted_total = round(current_total - float(existing["yarn_weight_kg"]) + new_weight, 2)
+        if adjusted_total < fetch_total_yarn_draw(connection, new_yarn_type):
             raise ValueError("Updated yarn purchase would drop below already consumed yarn.")
+
+        if existing_type != new_yarn_type:
+            old_type_projected_total = round(
+                fetch_total_yarn_purchased(connection, existing_type) - float(existing["yarn_weight_kg"]),
+                2,
+            )
+            if old_type_projected_total < fetch_total_yarn_draw(connection, existing_type):
+                raise ValueError("Cannot move this purchase to another yarn type because that stock has already been consumed.")
 
         connection.execute(
             """
             UPDATE yarn_purchases
-            SET date = ?, invoice_number = ?, yarn_weight_kg = ?, notes = ?
+            SET date = ?, invoice_number = ?, yarn_type = ?, yarn_weight_kg = ?, notes = ?
             WHERE id = ?
             """,
             (
                 payload["date"],
                 payload["invoice_number"],
+                new_yarn_type,
                 new_weight,
                 payload.get("notes", ""),
                 record_id,
@@ -586,9 +670,10 @@ def delete_yarn_purchase(record_id: int) -> None:
         raise ValueError("Record not found.")
 
     with get_connection() as connection:
-        current_total = fetch_total_yarn_purchased(connection)
+        yarn_type = normalize_yarn_type(existing.get("yarn_type"))
+        current_total = fetch_total_yarn_purchased(connection, yarn_type)
         projected_total = round(current_total - float(existing["yarn_weight_kg"]), 2)
-        if projected_total < fetch_total_yarn_draw(connection):
+        if projected_total < fetch_total_yarn_draw(connection, yarn_type):
             raise ValueError("Cannot delete this purchase because the yarn has already been consumed.")
 
         connection.execute("DELETE FROM yarn_purchases WHERE id = ?", (record_id,))
@@ -610,10 +695,16 @@ def update_processing_like_record(
     new_draw = round(yarn_consumed + wastage, 2)
 
     with get_connection() as connection:
-        total_purchased = fetch_total_yarn_purchased(connection)
-        total_draw = fetch_total_yarn_draw(connection)
+        yarn_type = WHITE_YARN if table_name == "processing_records" else BLACK_YARN
+        total_purchased = fetch_total_yarn_purchased(connection, yarn_type)
+        opening_key = INITIAL_WHITE_YARN_KEY if yarn_type == WHITE_YARN else INITIAL_BLACK_YARN_KEY
+        fallback_key = LEGACY_INITIAL_YARN_KEY if yarn_type == WHITE_YARN else None
+        opening_stock = fetch_config_number(connection, opening_key)
+        if fallback_key and opening_stock == 0:
+            opening_stock = fetch_config_number(connection, fallback_key)
+        total_draw = fetch_total_yarn_draw(connection, yarn_type)
         projected_draw = round(total_draw - old_draw + new_draw, 2)
-        if projected_draw > total_purchased:
+        if projected_draw > total_purchased + opening_stock:
             raise ValueError("Updated processing record exceeds available yarn balance.")
 
         if table_name == "processing_records":
@@ -737,9 +828,18 @@ def delete_dyeing_record(record_id: int) -> None:
 
 
 def set_initial_stock(yarn_kg: float, fabric_meters: float) -> dict[str, Any]:
+    return set_initial_stock_by_type(yarn_kg, 0, fabric_meters)
+
+
+def set_initial_stock_by_type(
+    white_yarn_kg: float, black_yarn_kg: float, white_fabric_meters: float
+) -> dict[str, Any]:
     with get_connection() as connection:
-        upsert_config_value(connection, INITIAL_YARN_KEY, str(round(yarn_kg, 2)))
-        upsert_config_value(connection, INITIAL_FABRIC_KEY, str(round(fabric_meters, 2)))
+        upsert_config_value(connection, INITIAL_WHITE_YARN_KEY, str(round(white_yarn_kg, 2)))
+        upsert_config_value(connection, INITIAL_BLACK_YARN_KEY, str(round(black_yarn_kg, 2)))
+        upsert_config_value(
+            connection, INITIAL_WHITE_FABRIC_KEY, str(round(white_fabric_meters, 2))
+        )
         recompute_processing_balances(connection)
         recompute_dyeing_balances(connection)
         connection.commit()

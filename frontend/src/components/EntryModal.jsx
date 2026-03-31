@@ -7,8 +7,16 @@ function InputField({
   placeholder,
   readOnly = false,
   confidence = "",
+  options = [],
 }) {
   const isLowConfidence = confidence === "low" && value !== "";
+  const sharedClassName = `rounded-2xl border px-4 py-3 text-sm outline-none transition ${
+    readOnly
+      ? "border-slate-100 bg-slate-50 text-slate-500"
+      : isLowConfidence
+        ? "border-amber-300 bg-amber-50 text-slate-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+        : "border-slate-200 bg-white focus:border-ocean focus:ring-2 focus:ring-teal-100"
+  }`;
 
   return (
     <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
@@ -20,22 +28,32 @@ function InputField({
           </span>
         ) : null}
       </span>
-      <input
-        type={type}
-        name={name}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        readOnly={readOnly}
-        disabled={readOnly}
-        className={`rounded-2xl border px-4 py-3 text-sm outline-none transition ${
-          readOnly
-            ? "border-slate-100 bg-slate-50 text-slate-500"
-            : isLowConfidence
-              ? "border-amber-300 bg-amber-50 text-slate-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-              : "border-slate-200 bg-white focus:border-ocean focus:ring-2 focus:ring-teal-100"
-        }`}
-      />
+      {type === "select" ? (
+        <select
+          name={name}
+          value={value}
+          onChange={onChange}
+          disabled={readOnly}
+          className={sharedClassName}
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type={type}
+          name={name}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          readOnly={readOnly}
+          disabled={readOnly}
+          className={sharedClassName}
+        />
+      )}
     </label>
   );
 }
@@ -88,6 +106,7 @@ export function EntryModal({
                 placeholder={field.placeholder}
                 readOnly={field.readOnly}
                 confidence={fieldConfidence[field.name]}
+                options={field.options}
               />
             ))}
           </div>
