@@ -234,6 +234,13 @@ def records():
                 ORDER BY date DESC, id DESC
                 """
             ),
+            "sagar_receipts": serialize_rows(
+                """
+                SELECT id, date, challan_number, fabric_type, meters, source_table, source_record_id, created_at
+                FROM sagar_receipts
+                ORDER BY date DESC, id DESC
+                """
+            ),
             "dashboard": get_dashboard(),
             "admin": get_admin_settings() if g.current_user["role"] == "admin" else None,
             "current_user": g.current_user,
@@ -361,6 +368,19 @@ def export_pdf():
                 ["date", "challan_number", "fabric_dyed_meters", "balance_meters"],
             ),
             [1.2 * inch, 1.6 * inch, 1.8 * inch, 1.7 * inch],
+        )
+    )
+    story.append(Spacer(1, 18))
+
+    story.append(Paragraph("5. Fabric Incoming At Sagar Loom Tex", section_style))
+    story.append(
+        create_report_table(
+            format_table_data(
+                ["Date", "Challan Number", "Fabric Type", "Meters"],
+                report_data["sagar_receipts"],
+                ["date", "challan_number", "fabric_type", "meters"],
+            ),
+            [1.2 * inch, 1.9 * inch, 1.3 * inch, 1.4 * inch],
         )
     )
 

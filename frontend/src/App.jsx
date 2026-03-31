@@ -15,6 +15,7 @@ const tabs = [
   "Shubham White Yarn",
   "Shubham Black Yarn",
   "Sai Leela Processors",
+  "Sagar Loom Tex Receipts",
 ];
 
 const exportOptions = [
@@ -125,6 +126,20 @@ const config = {
     tableColumns: processingColumns,
     emptyMessage: "No black processing records yet.",
   },
+  "Sagar Loom Tex Receipts": {
+    title: "Sagar Loom Tex Fabric Incoming",
+    recordsKey: "sagar_receipts",
+    searchKey: "challan_number",
+    summaryLabel: "Incoming fabric",
+    readOnly: true,
+    tableColumns: [
+      { key: "date", label: "Date" },
+      { key: "challan_number", label: "Challan #" },
+      { key: "fabric_type", label: "Type", render: (value) => String(value).toUpperCase() },
+      { key: "meters", label: "Meters" },
+    ],
+    emptyMessage: "No incoming Sagar fabric records yet.",
+  },
 };
 
 const stockFields = [
@@ -165,6 +180,7 @@ function createDefaultValues() {
       challan_number: "",
       fabric_dyed_meters: "",
     },
+    "Sagar Loom Tex Receipts": {},
     "Shubham Black Yarn": {
       date: today,
       challan_number: "",
@@ -234,6 +250,7 @@ export default function App() {
     processing_records: [],
     direct_processing_records: [],
     dyeing_records: [],
+    sagar_receipts: [],
     admin: {
       initial_white_yarn_stock_kg: 0,
       initial_black_yarn_stock_kg: 0,
@@ -324,6 +341,7 @@ export default function App() {
 
   const currentConfig = config[activeTab];
   const currentSelectedIds = selectedRecords[activeTab];
+  const isReadOnlyTab = Boolean(currentConfig.readOnly);
 
   async function loadAuthStatus() {
     const data = await api.getAuthStatus();
@@ -454,6 +472,9 @@ export default function App() {
   }
 
   function openCreateModal() {
+    if (isReadOnlyTab) {
+      return;
+    }
     setEditingRecordId(null);
     resetFormForTab(activeTab);
     setError("");
@@ -461,6 +482,9 @@ export default function App() {
   }
 
   function openEditModal(record) {
+    if (isReadOnlyTab) {
+      return;
+    }
     setEditingRecordId(record.id);
     setFormState((current) => ({
       ...current,
@@ -481,6 +505,9 @@ export default function App() {
   }
 
   function openDeleteModal(ids) {
+    if (isReadOnlyTab) {
+      return;
+    }
     setDeleteState({ open: true, ids });
     setError("");
   }
@@ -895,6 +922,8 @@ export default function App() {
       "Black yarn at Shubham stays on a direct path to Sagar Loom Tex, with its own yarn balance and challan history.",
     "Sai Leela Processors":
       "Sai Leela handles only the white-fabric branch. Balance is white fabric received from Shubham minus total dyed meters.",
+    "Sagar Loom Tex Receipts":
+      "This table is auto-generated. White entries come from Sai Leela dyeing challans, and black entries come directly from Shubham black challans.",
   };
 
   const flowSummary = records.dashboard.flow_summary;
@@ -1046,7 +1075,7 @@ export default function App() {
           <StatCard
             label="Fabric With Sagar"
             value={formatMetric(records.dashboard.total_fabric_with_sagar_meters, "m")}
-            subtitle="Combined white dyed fabric and black direct fabric already with Sagar."
+            subtitle={`White ${formatMetric(records.dashboard.white_fabric_with_sagar_meters, "m")} · Black ${formatMetric(records.dashboard.black_fabric_with_sagar_meters, "m")}`}
             accent="bg-orange-100 text-ember"
           />
         </section>
@@ -1072,13 +1101,15 @@ export default function App() {
             >
               Export PDF
             </button>
-            <button
-              type="button"
-              onClick={openCreateModal}
-              className="rounded-2xl bg-ember px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-orange-700"
-            >
-              New Entry
-            </button>
+            {!isReadOnlyTab ? (
+              <button
+                type="button"
+                onClick={openCreateModal}
+                className="rounded-2xl bg-ember px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-orange-700"
+              >
+                New Entry
+              </button>
+            ) : null}
           </div>
         </section>
 
@@ -1169,7 +1200,9 @@ export default function App() {
                       ? formatMetric(flowSummary.shubham_white.fabric_sent_to_sai_meters, "m")
                       : activeTab === "Shubham Black Yarn"
                         ? formatMetric(flowSummary.shubham_black.fabric_sent_to_sagar_meters, "m")
-                        : formatMetric(flowSummary.sai.balance_meters, "m")}
+                        : activeTab === "Sai Leela Processors"
+                          ? formatMetric(flowSummary.sai.balance_meters, "m")
+                          : formatMetric(flowSummary.sagar.total_fabric_received_meters, "m")}
                 </span>
               </div>
             </div>
@@ -1199,7 +1232,7 @@ export default function App() {
                 </button>
               </div>
 
-              {currentSelectedIds.length > 0 ? (
+              {!isReadOnlyTab && currentSelectedIds.length > 0 ? (
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center lg:justify-end">
                   <div className="text-sm font-semibold text-ink">
                     Selected: {currentSelectedIds.length} records
@@ -1229,6 +1262,7 @@ export default function App() {
                 rows={tableRows}
                 emptyMessage={currentConfig.emptyMessage}
                 selectedRowIds={currentSelectedIds}
+                actionsEnabled={!isReadOnlyTab}
                 onSelectRecord={handleSelectRecord}
                 onEditRecord={openEditModal}
                 onDeleteRecord={(row) => openDeleteModal([row.id])}
@@ -1238,39 +1272,57 @@ export default function App() {
 
           <SectionCard className="flex flex-col gap-5">
             <div>
-              <h3 className="text-xl font-bold text-ink">Entry options</h3>
+              <h3 className="text-xl font-bold text-ink">
+                {isReadOnlyTab ? "How this table works" : "Entry options"}
+              </h3>
               <p className="mt-2 text-sm text-slate-500">
-                Manual entry stays fully available. Uploads only help prefill fields before you
-                review and save.
+                {isReadOnlyTab
+                  ? "Sagar receipts are created automatically from the upstream challans, so this screen stays read-only and easy to audit."
+                  : "Manual entry stays fully available. Uploads only help prefill fields before you review and save."}
               </p>
             </div>
 
+            {isReadOnlyTab ? (
               <div className="rounded-3xl bg-peach p-5">
                 <div className="text-sm font-bold uppercase tracking-[0.24em] text-ember">
-                  Manual entry
+                  Automatic receipts
                 </div>
                 <p className="mt-2 text-sm text-slate-600">
-                  Open the modal form, capture the correct branch, and keep black and white stock
-                  ledgers synced without relying on document upload.
+                  White receipts are generated from Sai Leela dyeing entries and black receipts are
+                  generated from Shubham black-yarn records using the same challan number, date,
+                  and meters.
                 </p>
-                <button
-                type="button"
-                onClick={openCreateModal}
-                className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-ink shadow-sm"
-              >
-                Open Form
-              </button>
-            </div>
+              </div>
+            ) : (
+              <>
+                <div className="rounded-3xl bg-peach p-5">
+                  <div className="text-sm font-bold uppercase tracking-[0.24em] text-ember">
+                    Manual entry
+                  </div>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Open the modal form, capture the correct branch, and keep black and white stock
+                    ledgers synced without relying on document upload.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openCreateModal}
+                    className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-ink shadow-sm"
+                  >
+                    Open Form
+                  </button>
+                </div>
 
-            <UploadPanel
-              title={currentConfig.uploadTitle}
-              documentType={currentConfig.documentType}
-              preview={previewState[currentConfig.documentType]}
-              uploadError={uploadError}
-              uploading={uploading}
-              onFileChange={handleUpload}
-              onUsePreview={usePreviewData}
-            />
+                <UploadPanel
+                  title={currentConfig.uploadTitle}
+                  documentType={currentConfig.documentType}
+                  preview={previewState[currentConfig.documentType]}
+                  uploadError={uploadError}
+                  uploading={uploading}
+                  onFileChange={handleUpload}
+                  onUsePreview={usePreviewData}
+                />
+              </>
+            )}
 
             {error ? <p className="text-sm text-ember">{error}</p> : null}
           </SectionCard>

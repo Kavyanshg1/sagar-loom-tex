@@ -99,6 +99,14 @@ def get_filtered_records(
         """,
         params,
     )
+    sagar_receipts = serialize_rows(
+        f"""
+        SELECT date, challan_number, fabric_type, meters
+        FROM sagar_receipts{where_clause}
+        ORDER BY date ASC, id ASC
+        """,
+        params,
+    )
 
     return {
         "range_label": range_label,
@@ -106,6 +114,7 @@ def get_filtered_records(
         "processing_records": processing_records,
         "dyeing_records": dyeing_records,
         "direct_processing_records": direct_processing_records,
+        "sagar_receipts": sagar_receipts,
     }
 
 
@@ -373,6 +382,24 @@ def calculate_direct_fabric_sent_to_sagar() -> float:
     )
 
 
+def sync_sagar_receipts(connection) -> None:
+    connection.execute("DELETE FROM sagar_receipts")
+    connection.execute(
+        """
+        INSERT INTO sagar_receipts (source_table, source_record_id, date, challan_number, fabric_type, meters, created_at)
+        SELECT 'dyeing_records', id, date, challan_number, 'white', fabric_dyed_meters, created_at
+        FROM dyeing_records
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO sagar_receipts (source_table, source_record_id, date, challan_number, fabric_type, meters, created_at)
+        SELECT 'direct_processing_records', id, date, challan_number, 'black', fabric_produced_meters, created_at
+        FROM direct_processing_records
+        """
+    )
+
+
 def calculate_total_shubham_fabric_produced() -> float:
     return round(
         calculate_processing_fabric_sent_to_sai() + calculate_direct_fabric_sent_to_sagar(), 2
@@ -546,6 +573,7 @@ def add_yarn_purchase(payload: dict[str, Any]) -> dict[str, Any]:
             ),
         )
         recompute_processing_balances(connection)
+        sync_sagar_receipts(connection)
         connection.commit()
         record = connection.execute(
             "SELECT * FROM yarn_purchases WHERE id = ?", (cursor.lastrowid,)
@@ -576,6 +604,7 @@ def add_processing_like_record(table_name: str, payload: dict[str, Any]) -> dict
         recompute_processing_balances(connection)
         if table_name == "processing_records":
             recompute_dyeing_balances(connection)
+        sync_sagar_receipts(connection)
         connection.commit()
         record = connection.execute(
             f"SELECT * FROM {table_name} WHERE id = ?", (cursor.lastrowid,)
@@ -609,6 +638,7 @@ def add_dyeing_record(payload: dict[str, Any]) -> dict[str, Any]:
             ),
         )
         recompute_dyeing_balances(connection)
+        sync_sagar_receipts(connection)
         connection.commit()
         record = connection.execute(
             "SELECT * FROM dyeing_records WHERE id = ?", (cursor.lastrowid,)
@@ -657,6 +687,7 @@ def update_yarn_purchase(record_id: int, payload: dict[str, Any]) -> dict[str, A
             ),
         )
         recompute_processing_balances(connection)
+        sync_sagar_receipts(connection)
         connection.commit()
         record = connection.execute(
             "SELECT * FROM yarn_purchases WHERE id = ?", (record_id,)
@@ -678,6 +709,7 @@ def delete_yarn_purchase(record_id: int) -> None:
 
         connection.execute("DELETE FROM yarn_purchases WHERE id = ?", (record_id,))
         recompute_processing_balances(connection)
+        sync_sagar_receipts(connection)
         connection.commit()
 
 
@@ -734,6 +766,7 @@ def update_processing_like_record(
         recompute_processing_balances(connection)
         if table_name == "processing_records":
             recompute_dyeing_balances(connection)
+        sync_sagar_receipts(connection)
         connection.commit()
         record = connection.execute(
             f"SELECT * FROM {table_name} WHERE id = ?", (record_id,)
@@ -770,6 +803,7 @@ def delete_processing_like_record(table_name: str, record_id: int) -> None:
         recompute_processing_balances(connection)
         if table_name == "processing_records":
             recompute_dyeing_balances(connection)
+        sync_sagar_receipts(connection)
         connection.commit()
 
 
@@ -809,6 +843,7 @@ def update_dyeing_record(record_id: int, payload: dict[str, Any]) -> dict[str, A
             ),
         )
         recompute_dyeing_balances(connection)
+        sync_sagar_receipts(connection)
         connection.commit()
         record = connection.execute(
             "SELECT * FROM dyeing_records WHERE id = ?", (record_id,)
@@ -824,6 +859,7 @@ def delete_dyeing_record(record_id: int) -> None:
     with get_connection() as connection:
         connection.execute("DELETE FROM dyeing_records WHERE id = ?", (record_id,))
         recompute_dyeing_balances(connection)
+        sync_sagar_receipts(connection)
         connection.commit()
 
 
@@ -842,12 +878,19 @@ def set_initial_stock_by_type(
         )
         recompute_processing_balances(connection)
         recompute_dyeing_balances(connection)
+        sync_sagar_receipts(connection)
         connection.commit()
     return get_admin_settings()
 
 
 def clear_all_data() -> None:
     with get_connection() as connection:
-        for table_name in ("dyeing_records", "processing_records", "direct_processing_records", "yarn_purchases"):
+        for table_name in (
+            "sagar_receipts",
+            "dyeing_records",
+            "processing_records",
+            "direct_processing_records",
+            "yarn_purchases",
+        ):
             connection.execute(f"DELETE FROM {table_name}")
         connection.commit()

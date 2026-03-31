@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
-function ActionsMenu({ isOpen, onToggle, onSelect, onEdit, onDelete, selected }) {
+function ActionsMenu({ isOpen, onToggle, onSelect, onEdit, onDelete, selected, actionsEnabled }) {
+  if (!actionsEnabled) {
+    return null;
+  }
+
   return (
     <div className="relative">
       <button
@@ -51,6 +55,7 @@ export function RecordsTable({
   onSelectRecord,
   onEditRecord,
   onDeleteRecord,
+  actionsEnabled = true,
 }) {
   const [openMenuRowId, setOpenMenuRowId] = useState(null);
   const containerRef = useRef(null);
@@ -101,6 +106,7 @@ export function RecordsTable({
                   ) : null}
                 </div>
                 <ActionsMenu
+                  actionsEnabled={actionsEnabled}
                   isOpen={openMenuRowId === row.id}
                   onToggle={() =>
                     setOpenMenuRowId((current) => (current === row.id ? null : row.id))
@@ -152,16 +158,18 @@ export function RecordsTable({
                   {column.label}
                 </th>
               ))}
-              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                Actions
-              </th>
+              {actionsEnabled ? (
+                <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                  Actions
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={columns.length + 1}
+                  colSpan={columns.length + (actionsEnabled ? 1 : 0)}
                   className="px-4 py-8 text-center text-sm text-slate-500"
                 >
                   {emptyMessage}
@@ -182,27 +190,30 @@ export function RecordsTable({
                       {column.render ? column.render(row[column.key], row) : row[column.key]}
                     </td>
                   ))}
-                  <td className="px-4 py-3 text-right">
-                    <ActionsMenu
-                      isOpen={openMenuRowId === row.id}
-                      onToggle={() =>
-                        setOpenMenuRowId((current) => (current === row.id ? null : row.id))
-                      }
-                      onSelect={() => {
-                        onSelectRecord(row);
-                        setOpenMenuRowId(null);
-                      }}
-                      onEdit={() => {
-                        onEditRecord(row);
-                        setOpenMenuRowId(null);
-                      }}
-                      onDelete={() => {
-                        onDeleteRecord(row);
-                        setOpenMenuRowId(null);
-                      }}
-                      selected={selectedRowIds.includes(row.id)}
-                    />
-                  </td>
+                  {actionsEnabled ? (
+                    <td className="px-4 py-3 text-right">
+                      <ActionsMenu
+                        actionsEnabled={actionsEnabled}
+                        isOpen={openMenuRowId === row.id}
+                        onToggle={() =>
+                          setOpenMenuRowId((current) => (current === row.id ? null : row.id))
+                        }
+                        onSelect={() => {
+                          onSelectRecord(row);
+                          setOpenMenuRowId(null);
+                        }}
+                        onEdit={() => {
+                          onEditRecord(row);
+                          setOpenMenuRowId(null);
+                        }}
+                        onDelete={() => {
+                          onDeleteRecord(row);
+                          setOpenMenuRowId(null);
+                        }}
+                        selected={selectedRowIds.includes(row.id)}
+                      />
+                    </td>
+                  ) : null}
                 </tr>
               ))
             )}

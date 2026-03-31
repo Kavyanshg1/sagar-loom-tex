@@ -39,6 +39,18 @@ CREATE TABLE IF NOT EXISTS dyeing_records (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS sagar_receipts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_table TEXT NOT NULL,
+    source_record_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    challan_number TEXT NOT NULL,
+    fabric_type TEXT NOT NULL,
+    meters REAL NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(source_table, source_record_id)
+);
+
 CREATE TABLE IF NOT EXISTS app_config (
     key TEXT PRIMARY KEY,
     value TEXT

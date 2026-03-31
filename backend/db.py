@@ -166,10 +166,29 @@ def refresh_dyeing_balances(connection: sqlite3.Connection) -> None:
         )
 
 
+def refresh_sagar_receipts(connection: sqlite3.Connection) -> None:
+    connection.execute("DELETE FROM sagar_receipts")
+    connection.execute(
+        """
+        INSERT INTO sagar_receipts (source_table, source_record_id, date, challan_number, fabric_type, meters, created_at)
+        SELECT 'dyeing_records', id, date, challan_number, 'white', fabric_dyed_meters, created_at
+        FROM dyeing_records
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO sagar_receipts (source_table, source_record_id, date, challan_number, fabric_type, meters, created_at)
+        SELECT 'direct_processing_records', id, date, challan_number, 'black', fabric_produced_meters, created_at
+        FROM direct_processing_records
+        """
+    )
+
+
 def init_db() -> None:
     with get_connection() as connection:
         connection.executescript(SCHEMA_PATH.read_text())
         migrate_yarn_purchases(connection)
         migrate_dyeing_records(connection)
         refresh_dyeing_balances(connection)
+        refresh_sagar_receipts(connection)
         connection.commit()
