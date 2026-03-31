@@ -12,18 +12,18 @@ function InputField({
   const isLowConfidence = confidence === "low" && value !== "";
   const sharedClassName = `rounded-2xl border px-4 py-3 text-sm outline-none transition ${
     readOnly
-      ? "border-slate-100 bg-slate-50 text-slate-500"
+      ? "border-line bg-night text-slate-500"
       : isLowConfidence
-        ? "border-amber-300 bg-amber-50 text-slate-700 focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
-        : "border-slate-200 bg-white focus:border-ocean focus:ring-2 focus:ring-teal-100"
+        ? "border-fuchsia-500/50 bg-fuchsia-500/10 text-slate-100 focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-500/20"
+        : "border-line bg-panelSoft text-slate-100 focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
   }`;
 
   return (
-    <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+    <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
       <span className="flex items-center justify-between gap-3">
         <span>{label}</span>
         {isLowConfidence ? (
-          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-700">
+          <span className="rounded-full bg-fuchsia-500/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-fuchsia-200">
             Review
           </span>
         ) : null}
@@ -78,16 +78,16 @@ export function EntryModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-4 sm:items-center">
-      <div className="w-full max-w-2xl rounded-[32px] bg-white p-6 shadow-2xl">
+      <div className="w-full max-w-2xl rounded-[32px] border border-line bg-night p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-2xl font-bold text-ink">{title}</h3>
-            <p className="mt-2 text-sm text-slate-500">{description}</p>
+            <h3 className="font-display text-2xl font-bold tracking-[0.04em] text-white">{title}</h3>
+            <p className="mt-2 text-sm text-slate-400">{description}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-600"
+            className="rounded-full border border-line bg-panel px-3 py-2 text-sm font-semibold text-slate-300"
           >
             Close
           </button>
@@ -117,14 +117,14 @@ export function EntryModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600"
+              className="rounded-2xl border border-line px-5 py-3 text-sm font-semibold text-slate-300"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="rounded-2xl bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+              className="rounded-2xl bg-[linear-gradient(135deg,rgba(217,70,239,0.96),rgba(168,85,247,0.96))] px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {loading ? "Saving..." : submitLabel}
             </button>

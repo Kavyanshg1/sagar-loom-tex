@@ -1,20 +1,80 @@
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Sora:wght@400;500;600;700;800&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  color: #0f172a;
+  color: #e6ecff;
   background:
-    radial-gradient(circle at top left, rgba(251, 146, 60, 0.18), transparent 26%),
-    radial-gradient(circle at top right, rgba(20, 184, 166, 0.18), transparent 28%),
-    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+    radial-gradient(circle at 8% 10%, rgba(217, 70, 239, 0.2), transparent 18%),
+    radial-gradient(circle at 88% 12%, rgba(103, 232, 249, 0.16), transparent 22%),
+    radial-gradient(circle at 50% 100%, rgba(168, 85, 247, 0.18), transparent 28%),
+    linear-gradient(180deg, #04050f 0%, #090b17 42%, #050816 100%);
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
   margin: 0;
   min-width: 320px;
+  color: #e6ecff;
+  background: transparent;
+  position: relative;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  position: relative;
 }
 
 * {
   box-sizing: border-box;
+}
+
+::selection {
+  background: rgba(192, 132, 252, 0.28);
+  color: #f8fbff;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+body::before {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 88px 88px;
+  mask-image: radial-gradient(circle at center, black 52%, transparent 100%);
+  opacity: 0.35;
+}
+
+body::after {
+  background:
+    radial-gradient(circle at 20% 25%, rgba(217, 70, 239, 0.15), transparent 18%),
+    radial-gradient(circle at 78% 32%, rgba(192, 132, 252, 0.14), transparent 22%),
+    radial-gradient(circle at 55% 78%, rgba(103, 232, 249, 0.08), transparent 18%);
+  filter: blur(24px);
+  opacity: 0.95;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.45);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.55);
+  border-radius: 9999px;
+  border: 2px solid rgba(15, 23, 42, 0.45);
 }

@@ -5,8 +5,8 @@ export function TabButton({ label, active, onClick }) {
       onClick={onClick}
       className={`min-w-max rounded-2xl px-4 py-3 text-left text-sm font-semibold transition sm:text-center ${
         active
-          ? "bg-ink text-white shadow-lg"
-          : "bg-white/80 text-slate-600 hover:bg-white"
+          ? "bg-[linear-gradient(135deg,rgba(217,70,239,0.92),rgba(168,85,247,0.92))] text-white shadow-lg shadow-fuchsia-950/40"
+          : "border border-line bg-panelSoft/65 text-slate-300 hover:border-fuchsia-500/40 hover:bg-panel"
       }`}
     >
       {label}

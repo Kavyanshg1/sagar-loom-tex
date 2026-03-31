@@ -18,9 +18,9 @@ export function AuthScreen({
   const isFirstUser = userCount === 0;
 
   return (
-    <div className="min-h-screen px-4 py-6 text-ink sm:px-6 lg:px-8">
+    <div className="min-h-screen px-4 py-6 text-mist sm:px-6 lg:px-8">
       <div className="mx-auto grid min-h-[calc(100vh-3rem)] max-w-6xl gap-6 lg:grid-cols-[1.1fr,0.9fr]">
-        <section className="rounded-[36px] bg-ink px-6 py-8 text-white shadow-float sm:px-10">
+        <section className="rounded-[36px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(217,70,239,0.24),transparent_28%),radial-gradient(circle_at_top_right,rgba(103,232,249,0.16),transparent_30%),linear-gradient(180deg,#0b1020_0%,#0a0f1a_100%)] px-6 py-8 text-white shadow-float sm:px-10">
           <div className="flex items-center">
             <img
               src={logo}
@@ -39,10 +39,10 @@ export function AuthScreen({
 
           <div className="mt-10 max-w-xl">
             <div className="rounded-[30px] border border-white/10 bg-white/10 p-6 backdrop-blur">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-fuchsia-200">
                 Secure Operations
               </p>
-              <h2 className="mt-3 text-3xl font-bold leading-tight text-white">
+              <h2 className="mt-3 font-display text-3xl font-bold leading-tight tracking-[0.04em] text-white">
                 Run yarn, processing, dyeing, and direct-transfer operations under one protected
                 workspace.
               </h2>
@@ -76,8 +76,8 @@ export function AuthScreen({
         </section>
 
         <section className="flex items-center">
-          <div className="w-full rounded-[36px] border border-slate-200 bg-white p-6 shadow-float sm:p-8">
-            <div className="flex gap-3 rounded-2xl bg-slate-100 p-1">
+          <div className="w-full rounded-[36px] border border-line bg-panel/95 p-6 shadow-float sm:p-8">
+            <div className="flex gap-3 rounded-2xl bg-night p-1">
               {authModes.map((authMode) => (
                 <button
                   key={authMode.key}
@@ -85,8 +85,8 @@ export function AuthScreen({
                   onClick={() => onModeChange(authMode.key)}
                   className={`flex-1 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
                     mode === authMode.key
-                      ? "bg-white text-ink shadow-sm"
-                      : "text-slate-500 hover:text-ink"
+                      ? "bg-panelSoft text-white shadow-sm"
+                      : "text-slate-400 hover:text-white"
                   }`}
                 >
                   {authMode.label}
@@ -95,10 +95,10 @@ export function AuthScreen({
             </div>
 
             <div className="mt-6">
-              <h3 className="text-2xl font-bold text-ink">
+              <h3 className="font-display text-2xl font-bold tracking-[0.04em] text-white">
                 {mode === "login" ? "Welcome back" : "Create your workspace login"}
               </h3>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-slate-400">
                 {mode === "login"
                   ? "Sign in to continue to the SAGAR LOOM TEX dashboard."
                   : isFirstUser
@@ -109,59 +109,59 @@ export function AuthScreen({
 
             <form className="mt-6 space-y-4" onSubmit={onSubmit}>
               {mode === "signup" ? (
-                <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+                <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
                   <span>Full Name</span>
                   <input
                     type="text"
                     name="name"
                     value={values.name}
                     onChange={onChange}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-ocean focus:ring-2 focus:ring-teal-100"
+                    className="rounded-2xl border border-line bg-night px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
                     placeholder="Sagar Admin"
                   />
                 </label>
               ) : null}
 
-              <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+              <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
                 <span>Email Address</span>
                 <input
                   type="email"
                   name="email"
                   value={values.email}
                   onChange={onChange}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-ocean focus:ring-2 focus:ring-teal-100"
+                  className="rounded-2xl border border-line bg-night px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
                   placeholder="you@company.com"
                 />
               </label>
 
-              <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+              <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
                 <span>Password</span>
                 <input
                   type="password"
                   name="password"
                   value={values.password}
                   onChange={onChange}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-ocean focus:ring-2 focus:ring-teal-100"
+                  className="rounded-2xl border border-line bg-night px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
                   placeholder="At least 8 characters"
                 />
               </label>
 
               {mode === "signup" ? (
-                <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+                <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
                   <span>Confirm Password</span>
                   <input
                     type="password"
                     name="confirm_password"
                     value={values.confirm_password}
                     onChange={onChange}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-ocean focus:ring-2 focus:ring-teal-100"
+                    className="rounded-2xl border border-line bg-night px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
                     placeholder="Repeat your password"
                   />
                 </label>
               ) : null}
 
               {error ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-medium text-rose-200">
                   {error}
                 </div>
               ) : null}
@@ -169,7 +169,7 @@ export function AuthScreen({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-2xl bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                className="w-full rounded-2xl bg-[linear-gradient(135deg,rgba(217,70,239,0.96),rgba(168,85,247,0.96))] px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {loading
                   ? mode === "login"

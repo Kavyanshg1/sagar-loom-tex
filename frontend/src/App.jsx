@@ -217,14 +217,14 @@ function FlowNode({ active, label, subtitle, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-[26px] border p-5 text-left shadow-sm transition duration-200 ${
+        className={`rounded-[26px] border p-5 text-left shadow-sm transition duration-200 ${
         active
-          ? "border-ink bg-ink text-white shadow-float"
-          : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+          ? "border-fuchsia-400/40 bg-[linear-gradient(135deg,rgba(217,70,239,0.18),rgba(168,85,247,0.14))] text-white shadow-float"
+          : "border-line bg-panel hover:-translate-y-0.5 hover:border-slate-500 hover:bg-panelSoft hover:shadow-md"
       }`}
     >
-      <div className="text-lg font-bold">{label}</div>
-      <div className={`mt-2 text-sm ${active ? "text-slate-200" : "text-slate-500"}`}>
+      <div className="font-display text-lg font-bold tracking-[0.04em]">{label}</div>
+      <div className={`mt-2 text-sm ${active ? "text-slate-200" : "text-slate-400"}`}>
         {subtitle}
       </div>
     </button>
@@ -890,9 +890,9 @@ export default function App() {
 
   if (!authResolved) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4 py-6 text-ink">
-        <div className="rounded-[32px] border border-slate-200 bg-white px-6 py-5 shadow-float">
-          <div className="text-sm font-semibold text-slate-500">Checking secure session...</div>
+      <div className="flex min-h-screen items-center justify-center px-4 py-6 text-mist">
+        <div className="rounded-[32px] border border-line bg-panel px-6 py-5 shadow-float">
+          <div className="text-sm font-semibold text-slate-400">Checking secure session...</div>
         </div>
       </div>
     );
@@ -955,9 +955,9 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen px-3 py-4 text-ink sm:px-6 sm:py-6 lg:px-8">
+    <div className="min-h-screen px-3 py-4 text-mist sm:px-6 sm:py-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <section className="rounded-[32px] bg-ink px-4 py-6 text-white shadow-float sm:rounded-[36px] sm:px-10 sm:py-8">
+        <section className="rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(217,70,239,0.22),transparent_24%),radial-gradient(circle_at_top_right,rgba(103,232,249,0.12),transparent_22%),linear-gradient(180deg,#0a1020_0%,#080c16_100%)] px-4 py-6 text-white shadow-float sm:rounded-[36px] sm:px-10 sm:py-8">
           <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex items-center">
               <img
@@ -966,7 +966,7 @@ export default function App() {
                 className="mr-3 h-10 w-auto object-contain sm:mr-4 sm:h-14"
               />
               <div>
-                <h1 className="text-xl font-bold tracking-tight text-white sm:text-3xl">
+                <h1 className="font-display text-xl font-bold tracking-[0.08em] text-white sm:text-3xl">
                   SAGAR LOOM TEX
                 </h1>
                 <p className="mt-1 text-xs text-blue-200 sm:text-base">
@@ -996,11 +996,11 @@ export default function App() {
                       <span className="text-lg leading-none">⋮</span>
                     </button>
                     {showAdminMenu ? (
-                      <div className="absolute right-0 top-[calc(100%+0.75rem)] z-30 w-64 rounded-3xl border border-slate-200 bg-white p-2 text-ink shadow-2xl">
+                      <div className="absolute right-0 top-[calc(100%+0.75rem)] z-30 w-64 rounded-3xl border border-line bg-night p-2 text-mist shadow-2xl">
                         <button
                           type="button"
                           onClick={() => openAdminModal("stock")}
-                          className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-semibold transition hover:bg-slate-50"
+                          className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-semibold transition hover:bg-panel"
                         >
                           <span>Set Starting Stock</span>
                           <span className="text-slate-400">↗</span>
@@ -1008,7 +1008,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => openAdminModal("clear")}
-                          className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-semibold transition hover:bg-slate-50"
+                          className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-semibold transition hover:bg-panel"
                         >
                           <span>Clear All Data</span>
                           <span className="text-slate-400">↗</span>
@@ -1016,7 +1016,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => openAdminModal("password")}
-                          className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-semibold transition hover:bg-slate-50"
+                          className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-semibold transition hover:bg-panel"
                         >
                           <span>
                             {records.admin?.password_set ? "Change Password" : "Set Password"}
@@ -1048,7 +1048,7 @@ export default function App() {
         </section>
 
         {adminMessage ? (
-          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+          <div className="mt-4 rounded-2xl border border-fuchsia-500/25 bg-fuchsia-500/10 px-4 py-3 text-sm font-medium text-fuchsia-100">
             {adminMessage}
           </div>
         ) : null}
@@ -1058,25 +1058,25 @@ export default function App() {
             label="Shubham White Yarn"
             value={formatMetric(records.dashboard.white_yarn_with_shubham_kg, "kg")}
             subtitle="Live white-yarn stock available for the Sai Leela branch."
-            accent="bg-sand text-ember"
+            accent="bg-fuchsia-500/20 text-fuchsia-100"
           />
           <StatCard
             label="Shubham Black Yarn"
             value={formatMetric(records.dashboard.black_yarn_with_shubham_kg, "kg")}
             subtitle="Live black-yarn stock available for direct Sagar production."
-            accent="bg-slate-200 text-slate-800"
+            accent="bg-violet-500/20 text-violet-100"
           />
           <StatCard
             label="Sai White Fabric"
             value={formatMetric(records.dashboard.white_fabric_with_sai_meters, "m")}
             subtitle="White fabric currently available at Sai Leela after dyeing."
-            accent="bg-teal-100 text-ocean"
+            accent="bg-cyan-500/20 text-cyan-100"
           />
           <StatCard
             label="Fabric With Sagar"
             value={formatMetric(records.dashboard.total_fabric_with_sagar_meters, "m")}
             subtitle={`White ${formatMetric(records.dashboard.white_fabric_with_sagar_meters, "m")} · Black ${formatMetric(records.dashboard.black_fabric_with_sagar_meters, "m")}`}
-            accent="bg-orange-100 text-ember"
+            accent="bg-purple-500/20 text-purple-100"
           />
         </section>
 
@@ -1097,7 +1097,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setShowExportPanel((current) => !current)}
-              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:bg-slate-50"
+              className="rounded-2xl border border-line bg-panel px-5 py-3 text-sm font-semibold text-slate-200 shadow-sm transition hover:bg-panelSoft"
             >
               Export PDF
             </button>
@@ -1105,7 +1105,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={openCreateModal}
-                className="rounded-2xl bg-ember px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-orange-700"
+                className="rounded-2xl bg-[linear-gradient(135deg,rgba(217,70,239,0.96),rgba(168,85,247,0.96))] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-fuchsia-950/40 transition hover:brightness-110"
               >
                 New Entry
               </button>
@@ -1114,11 +1114,11 @@ export default function App() {
         </section>
 
         {showExportPanel ? (
-          <section className="mt-4 rounded-[28px] border border-slate-200 bg-white/90 p-4 shadow-float backdrop-blur sm:p-5">
+          <section className="mt-4 rounded-[28px] border border-line bg-panel/95 p-4 shadow-float backdrop-blur sm:p-5">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-ink">Export production report</h3>
-                <p className="mt-1 text-sm text-slate-500">
+                <h3 className="font-display text-lg font-bold tracking-[0.04em] text-white">Export production report</h3>
+                <p className="mt-1 text-sm text-slate-400">
                   Download a clean PDF report covering yarn purchases, processing, direct
                   transfers, and dyeing records for the selected period.
                 </p>
@@ -1130,8 +1130,8 @@ export default function App() {
                       onClick={() => setExportRange(option.value)}
                       className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
                         exportRange === option.value
-                          ? "bg-ink text-white shadow-lg"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          ? "bg-[linear-gradient(135deg,rgba(217,70,239,0.96),rgba(168,85,247,0.96))] text-white shadow-lg"
+                          : "border border-line bg-night text-slate-300 hover:bg-panelSoft"
                       }`}
                     >
                       {option.label}
@@ -1147,7 +1147,7 @@ export default function App() {
                         name="start_date"
                         value={customRange.start_date}
                         onChange={handleCustomDateChange}
-                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-ocean focus:ring-2 focus:ring-teal-100"
+                        className="rounded-2xl border border-line bg-night px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
                       />
                     </label>
                     <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
@@ -1157,7 +1157,7 @@ export default function App() {
                         name="end_date"
                         value={customRange.end_date}
                         onChange={handleCustomDateChange}
-                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-ocean focus:ring-2 focus:ring-teal-100"
+                        className="rounded-2xl border border-line bg-night px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
                       />
                     </label>
                   </div>
@@ -1167,7 +1167,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowExportPanel(false)}
-                  className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600"
+                  className="rounded-2xl border border-line px-5 py-3 text-sm font-semibold text-slate-300"
                 >
                   Cancel
                 </button>
@@ -1175,7 +1175,7 @@ export default function App() {
                   type="button"
                   onClick={handleExportPdf}
                   disabled={exporting}
-                  className="rounded-2xl bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="rounded-2xl bg-[linear-gradient(135deg,rgba(217,70,239,0.96),rgba(168,85,247,0.96))] px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {exporting ? "Generating..." : "Download PDF"}
                 </button>
@@ -1188,12 +1188,12 @@ export default function App() {
           <SectionCard>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-ink">{currentConfig.title}</h2>
-                <p className="mt-1 text-sm text-slate-500">{autoInsightMap[activeTab]}</p>
+                <h2 className="font-display text-2xl font-bold tracking-[0.04em] text-white">{currentConfig.title}</h2>
+                <p className="mt-1 text-sm text-slate-400">{autoInsightMap[activeTab]}</p>
               </div>
-              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              <div className="rounded-2xl border border-line bg-night px-4 py-3 text-sm text-slate-300">
                 {currentConfig.summaryLabel}:{" "}
-                <span className="font-bold text-ink">
+                <span className="font-bold text-white">
                   {activeTab === "Manglam Yarn Purchases"
                     ? `${formatMetric(flowSummary.manglam.white_yarn_purchased_kg, "kg")} white / ${formatMetric(flowSummary.manglam.black_yarn_purchased_kg, "kg")} black`
                     : activeTab === "Shubham White Yarn"
@@ -1207,9 +1207,9 @@ export default function App() {
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col gap-3 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="mt-6 flex flex-col gap-3 rounded-3xl border border-line bg-night px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),auto] md:items-center lg:flex-1">
-                <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+                <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
                   <span>Search {currentConfig.searchKey.replaceAll("_", " ")}</span>
                   <input
                     type="text"
@@ -1220,13 +1220,13 @@ export default function App() {
                         ? "Search invoice number"
                         : "Search challan number"
                     }
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-ocean focus:ring-2 focus:ring-teal-100"
+                    className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
                   />
                 </label>
                 <button
                   type="button"
                   onClick={toggleSortDirection}
-                  className="rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-ink shadow-sm transition hover:bg-slate-100"
+                  className="rounded-2xl bg-panelSoft px-4 py-3 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-panel"
                 >
                   Sort by Date: {sortState[activeTab] === "desc" ? "Newest" : "Oldest"}
                 </button>
@@ -1234,14 +1234,14 @@ export default function App() {
 
               {!isReadOnlyTab && currentSelectedIds.length > 0 ? (
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center lg:justify-end">
-                  <div className="text-sm font-semibold text-ink">
+                  <div className="text-sm font-semibold text-white">
                     Selected: {currentSelectedIds.length} records
                   </div>
                   <button
                     type="button"
                     onClick={handleEditSelected}
                     disabled={currentSelectedIds.length !== 1}
-                    className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-2xl bg-panelSoft px-4 py-2 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-panel disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Update
                   </button>
@@ -1272,10 +1272,10 @@ export default function App() {
 
           <SectionCard className="flex flex-col gap-5">
             <div>
-              <h3 className="text-xl font-bold text-ink">
+              <h3 className="font-display text-xl font-bold tracking-[0.04em] text-white">
                 {isReadOnlyTab ? "How this table works" : "Entry options"}
               </h3>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-slate-400">
                 {isReadOnlyTab
                   ? "Sagar receipts are created automatically from the upstream challans, so this screen stays read-only and easy to audit."
                   : "Manual entry stays fully available. Uploads only help prefill fields before you review and save."}
@@ -1283,11 +1283,11 @@ export default function App() {
             </div>
 
             {isReadOnlyTab ? (
-              <div className="rounded-3xl bg-peach p-5">
-                <div className="text-sm font-bold uppercase tracking-[0.24em] text-ember">
+              <div className="rounded-3xl border border-cyan-500/20 bg-cyan-500/10 p-5">
+                <div className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-100">
                   Automatic receipts
                 </div>
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm text-slate-300">
                   White receipts are generated from Sai Leela dyeing entries and black receipts are
                   generated from Shubham black-yarn records using the same challan number, date,
                   and meters.
@@ -1295,18 +1295,18 @@ export default function App() {
               </div>
             ) : (
               <>
-                <div className="rounded-3xl bg-peach p-5">
-                  <div className="text-sm font-bold uppercase tracking-[0.24em] text-ember">
+                <div className="rounded-3xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-5">
+                  <div className="text-sm font-bold uppercase tracking-[0.24em] text-fuchsia-100">
                     Manual entry
                   </div>
-                  <p className="mt-2 text-sm text-slate-600">
+                  <p className="mt-2 text-sm text-slate-300">
                     Open the modal form, capture the correct branch, and keep black and white stock
                     ledgers synced without relying on document upload.
                   </p>
                   <button
                     type="button"
                     onClick={openCreateModal}
-                    className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-ink shadow-sm"
+                    className="mt-4 rounded-2xl bg-night px-4 py-3 text-sm font-semibold text-slate-100 shadow-sm"
                   >
                     Open Form
                   </button>
@@ -1332,8 +1332,8 @@ export default function App() {
           <SectionCard>
               <div className="flex flex-col gap-3">
               <div>
-                <h3 className="text-2xl font-bold text-ink">Production Flow</h3>
-                <p className="mt-1 text-sm text-slate-500">
+                <h3 className="font-display text-2xl font-bold tracking-[0.04em] text-white">Production Flow</h3>
+                <p className="mt-1 text-sm text-slate-400">
                   Click any node to inspect the simplified white-yarn and black-yarn routes from
                   purchase to final receipt at Sagar Loom Tex.
                 </p>
@@ -1381,13 +1381,13 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                <div className="text-sm font-bold uppercase tracking-[0.24em] text-slate-500">
+              <div className="mt-4 rounded-[28px] border border-line bg-night p-5">
+                <div className="text-sm font-bold uppercase tracking-[0.24em] text-slate-400">
                   {activeFlowNode} summary
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-3">
                   {flowNodeDetails[activeFlowNode].map((detail) => (
-                    <div key={detail} className="rounded-2xl bg-white px-4 py-4 text-sm font-semibold text-ink shadow-sm">
+                    <div key={detail} className="rounded-2xl border border-line bg-panel px-4 py-4 text-sm font-semibold text-slate-100 shadow-sm">
                       {detail}
                     </div>
                   ))}
@@ -1443,7 +1443,7 @@ export default function App() {
               name="clear_password"
               value={adminForm.clear_password}
               onChange={handleAdminFormChange}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-ocean focus:ring-2 focus:ring-teal-100"
+              className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
             />
           </label>
           {adminError ? <p className="mt-3 text-sm text-ember">{adminError}</p> : null}
@@ -1467,13 +1467,13 @@ export default function App() {
           loading={saving}
         >
           {(activeTab === "Shubham White Yarn" || activeTab === "Shubham Black Yarn") ? (
-            <div className="rounded-3xl bg-slate-50 p-4 text-sm text-slate-600">
+            <div className="rounded-3xl border border-line bg-night p-4 text-sm text-slate-300">
               Wastage is calculated at 4% of yarn consumed. Each Shubham branch recomputes against
               its own yarn stock on save, so white and black balances stay independent.
             </div>
           ) : null}
           {activeTab === "Sai Leela Processors" ? (
-            <div className="rounded-3xl bg-slate-50 p-4 text-sm text-slate-600">
+            <div className="rounded-3xl border border-line bg-night p-4 text-sm text-slate-300">
               Sai Leela handles only the white branch. Balance is based on white fabric received
               from Shubham White Yarn records minus dyed meters.
             </div>
