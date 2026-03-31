@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS yarn_purchases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT NOT NULL,
     invoice_number TEXT NOT NULL,
+    yarn_type TEXT NOT NULL DEFAULT 'white',
     yarn_weight_kg REAL NOT NULL,
     notes TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

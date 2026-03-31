@@ -120,6 +120,21 @@ def migrate_dyeing_records(connection: sqlite3.Connection) -> None:
     connection.execute("ALTER TABLE dyeing_records_new RENAME TO dyeing_records")
 
 
+def migrate_yarn_purchases(connection: sqlite3.Connection) -> None:
+    columns = get_table_columns(connection, "yarn_purchases")
+    if "yarn_type" in columns:
+        return
+
+    connection.execute("ALTER TABLE yarn_purchases ADD COLUMN yarn_type TEXT NOT NULL DEFAULT 'white'")
+    connection.execute(
+        """
+        UPDATE yarn_purchases
+        SET yarn_type = 'white'
+        WHERE yarn_type IS NULL OR yarn_type = ''
+        """
+    )
+
+
 def refresh_dyeing_balances(connection: sqlite3.Connection) -> None:
     columns = get_table_columns(connection, "dyeing_records")
     if not {"fabric_dyed_meters", "balance_meters"}.issubset(columns):
@@ -154,6 +169,7 @@ def refresh_dyeing_balances(connection: sqlite3.Connection) -> None:
 def init_db() -> None:
     with get_connection() as connection:
         connection.executescript(SCHEMA_PATH.read_text())
+        migrate_yarn_purchases(connection)
         migrate_dyeing_records(connection)
         refresh_dyeing_balances(connection)
         connection.commit()

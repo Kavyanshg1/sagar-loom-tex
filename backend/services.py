@@ -12,10 +12,16 @@ from werkzeug.security import check_password_hash, generate_password_hash
 WASTAGE_RATE = 0.04
 PROCESSING_TABLES = ("processing_records", "direct_processing_records")
 PASSWORD_KEY = "password_hash"
-INITIAL_YARN_KEY = "initial_yarn"
-INITIAL_FABRIC_KEY = "initial_fabric"
+INITIAL_WHITE_YARN_KEY = "initial_white_yarn"
+INITIAL_BLACK_YARN_KEY = "initial_black_yarn"
+INITIAL_WHITE_FABRIC_KEY = "initial_white_fabric"
+LEGACY_INITIAL_YARN_KEY = "initial_yarn"
+LEGACY_INITIAL_FABRIC_KEY = "initial_fabric"
 ADMIN_ROLE = "admin"
 USER_ROLE = "user"
+WHITE_YARN = "white"
+BLACK_YARN = "black"
+YARN_TYPES = (WHITE_YARN, BLACK_YARN)
 
 
 def serialize_rows(query: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
@@ -130,6 +136,13 @@ def fetch_config_number(connection, key: str) -> float:
         return round(float(raw_value), 2)
     except ValueError:
         return 0.0
+
+
+def normalize_yarn_type(raw_value: str | None) -> str:
+    yarn_type = str(raw_value or WHITE_YARN).strip().lower()
+    if yarn_type not in YARN_TYPES:
+        raise ValueError("yarn_type must be either 'white' or 'black'.")
+    return yarn_type
 
 
 def upsert_config_value(connection, key: str, value: str) -> None:
