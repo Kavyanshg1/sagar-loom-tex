@@ -11,10 +11,19 @@ from flask import Flask, g, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    BaseDocTemplate,
+    Frame,
+    PageBreak,
+    PageTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from db import STORAGE_DIR, init_db
 from services import (
@@ -64,6 +73,7 @@ CORS(app, origins=allowed_origins or "*")
 BASE_DIR = Path(__file__).resolve().parent
 RESOURCE_BASE_DIR = Path(getattr(sys, "_MEIPASS", BASE_DIR.parent))
 FRONTEND_DIST_DIR = RESOURCE_BASE_DIR / "frontend" / "dist"
+LOGO_PATH = BASE_DIR.parent / "frontend" / "src" / "assets" / "logo.png"
 UPLOAD_DIR = STORAGE_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 init_db()
@@ -150,19 +160,43 @@ def create_report_table(data: list[list[str]], column_widths: list[float]):
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("BACKGROUND", (0, 1), (-1, -1), colors.white),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
-                ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ]
         )
     )
     return table
+
+
+def draw_pdf_header(canvas, doc):
+    canvas.saveState()
+    if LOGO_PATH.exists():
+        logo_width = 0.7 * inch
+        logo_height = 0.7 * inch
+        canvas.drawImage(
+            str(LOGO_PATH),
+            doc.pagesize[0] - doc.rightMargin - logo_width,
+            doc.pagesize[1] - 0.85 * inch,
+            width=logo_width,
+            height=logo_height,
+            preserveAspectRatio=True,
+            mask="auto",
+        )
+    canvas.setFont("Helvetica", 9)
+    canvas.setFillColor(colors.HexColor("#64748b"))
+    canvas.drawRightString(
+        doc.pagesize[0] - doc.rightMargin,
+        0.45 * inch,
+        f"Page {canvas.getPageNumber()}",
+    )
+    canvas.restoreState()
 
 
 @app.get("/health")
@@ -261,40 +295,63 @@ def export_pdf():
         return error(str(exc))
 
     buffer = BytesIO()
-    doc = SimpleDocTemplate(
+    pagesize = landscape(A4)
+    left_margin = 0.5 * inch
+    right_margin = 0.5 * inch
+    top_margin = 1.15 * inch
+    bottom_margin = 0.6 * inch
+    gutter = 0.3 * inch
+    usable_width = pagesize[0] - left_margin - right_margin - gutter
+    frame_width = usable_width / 2
+    frame_height = pagesize[1] - top_margin - bottom_margin
+
+    doc = BaseDocTemplate(
         buffer,
-        pagesize=A4,
-        leftMargin=0.55 * inch,
-        rightMargin=0.55 * inch,
-        topMargin=0.6 * inch,
-        bottomMargin=0.6 * inch,
+        pagesize=pagesize,
+        leftMargin=left_margin,
+        rightMargin=right_margin,
+        topMargin=top_margin,
+        bottomMargin=bottom_margin,
+    )
+    doc.addPageTemplates(
+        [
+            PageTemplate(
+                id="two-column-report",
+                frames=[
+                    Frame(left_margin, bottom_margin, frame_width, frame_height, id="col-1"),
+                    Frame(left_margin + frame_width + gutter, bottom_margin, frame_width, frame_height, id="col-2"),
+                ],
+                onPage=draw_pdf_header,
+            )
+        ]
     )
     styles = getSampleStyleSheet()
     story = []
 
     title_style = styles["Title"]
     title_style.fontName = "Helvetica-Bold"
-    title_style.fontSize = 20
+    title_style.fontSize = 18
     title_style.textColor = colors.HexColor("#0f172a")
+    title_style.spaceAfter = 6
 
     subtitle_style = styles["BodyText"]
     subtitle_style.fontName = "Helvetica"
-    subtitle_style.fontSize = 10
-    subtitle_style.leading = 14
+    subtitle_style.fontSize = 9
+    subtitle_style.leading = 12
     subtitle_style.textColor = colors.HexColor("#475569")
 
     section_style = styles["Heading2"]
     section_style.fontName = "Helvetica-Bold"
-    section_style.fontSize = 13
+    section_style.fontSize = 11
     section_style.textColor = colors.HexColor("#0f172a")
-    section_style.spaceAfter = 8
+    section_style.spaceAfter = 6
 
     story.append(Paragraph("SAGAR LOOM TEX", title_style))
-    story.append(Paragraph("Textile Production Flow Report", styles["Heading2"]))
-    story.append(Spacer(1, 8))
+    story.append(Paragraph("Textile Production Flow Report", styles["Heading3"]))
+    story.append(Spacer(1, 4))
     story.append(Paragraph(f"Generated on: {date.today().isoformat()}", subtitle_style))
     story.append(Paragraph(f"Range: {report_data['range_label']}", subtitle_style))
-    story.append(Spacer(1, 18))
+    story.append(Spacer(1, 12))
 
     story.append(Paragraph("1. Yarn Purchases (Manglam Yarn Agencies)", section_style))
     story.append(
@@ -304,10 +361,10 @@ def export_pdf():
                 report_data["yarn_purchases"],
                 ["date", "invoice_number", "yarn_type", "yarn_weight_kg", "notes"],
             ),
-            [0.95 * inch, 1.2 * inch, 0.9 * inch, 1.2 * inch, 2.65 * inch],
+            [0.75 * inch, 1.0 * inch, 0.75 * inch, 0.85 * inch, 2.1 * inch],
         )
     )
-    story.append(Spacer(1, 18))
+    story.append(Spacer(1, 12))
 
     story.append(Paragraph("2. Shubham White Yarn (To Sai Leela)", section_style))
     story.append(
@@ -329,10 +386,10 @@ def export_pdf():
                     "fabric_produced_meters",
                 ],
             ),
-            [0.9 * inch, 1.2 * inch, 1.2 * inch, 1.0 * inch, 1.9 * inch],
+            [0.75 * inch, 0.95 * inch, 0.9 * inch, 0.75 * inch, 1.45 * inch],
         )
     )
-    story.append(Spacer(1, 18))
+    story.append(Spacer(1, 12))
 
     story.append(Paragraph("3. Shubham Black Yarn (Direct To Sagar Loom Tex)", section_style))
     story.append(
@@ -354,10 +411,10 @@ def export_pdf():
                     "fabric_produced_meters",
                 ],
             ),
-            [0.9 * inch, 1.2 * inch, 1.2 * inch, 1.0 * inch, 1.9 * inch],
+            [0.75 * inch, 0.95 * inch, 0.9 * inch, 0.75 * inch, 1.45 * inch],
         )
     )
-    story.append(Spacer(1, 18))
+    story.append(Spacer(1, 12))
 
     story.append(Paragraph("4. Dyeing Records (Sai Leela Processors)", section_style))
     story.append(
@@ -367,10 +424,10 @@ def export_pdf():
                 report_data["dyeing_records"],
                 ["date", "challan_number", "fabric_dyed_meters", "balance_meters"],
             ),
-            [1.2 * inch, 1.6 * inch, 1.8 * inch, 1.7 * inch],
+            [0.95 * inch, 1.25 * inch, 1.3 * inch, 1.2 * inch],
         )
     )
-    story.append(Spacer(1, 18))
+    story.append(Spacer(1, 12))
 
     story.append(Paragraph("5. Fabric Incoming At Sagar Loom Tex", section_style))
     story.append(
@@ -380,7 +437,7 @@ def export_pdf():
                 report_data["sagar_receipts"],
                 ["date", "challan_number", "fabric_type", "meters"],
             ),
-            [1.2 * inch, 1.9 * inch, 1.3 * inch, 1.4 * inch],
+            [0.95 * inch, 1.45 * inch, 0.95 * inch, 0.95 * inch],
         )
     )
 
