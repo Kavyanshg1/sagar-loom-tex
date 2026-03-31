@@ -6,19 +6,23 @@
 
 :root {
   color: #e6ecff;
-  background:
-    radial-gradient(circle at 8% 10%, rgba(217, 70, 239, 0.2), transparent 18%),
-    radial-gradient(circle at 88% 12%, rgba(103, 232, 249, 0.16), transparent 22%),
-    radial-gradient(circle at 50% 100%, rgba(168, 85, 247, 0.18), transparent 28%),
-    linear-gradient(180deg, #04050f 0%, #090b17 42%, #050816 100%);
+  background: #000000;
   font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  background: #000000;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   color: #e6ecff;
-  background: transparent;
+  background:
+    radial-gradient(circle at 8% 10%, rgba(217, 70, 239, 0.14), transparent 18%),
+    radial-gradient(circle at 88% 12%, rgba(103, 232, 249, 0.12), transparent 22%),
+    radial-gradient(circle at 50% 100%, rgba(168, 85, 247, 0.14), transparent 28%),
+    linear-gradient(180deg, #000000 0%, #04050f 40%, #03050d 100%);
   position: relative;
   overflow-x: hidden;
 }
@@ -48,20 +52,20 @@ body::after {
 
 body::before {
   background:
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.016) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.016) 1px, transparent 1px);
   background-size: 88px 88px;
   mask-image: radial-gradient(circle at center, black 52%, transparent 100%);
-  opacity: 0.35;
+  opacity: 0.24;
 }
 
 body::after {
   background:
-    radial-gradient(circle at 20% 25%, rgba(217, 70, 239, 0.15), transparent 18%),
-    radial-gradient(circle at 78% 32%, rgba(192, 132, 252, 0.14), transparent 22%),
-    radial-gradient(circle at 55% 78%, rgba(103, 232, 249, 0.08), transparent 18%);
-  filter: blur(24px);
-  opacity: 0.95;
+    radial-gradient(circle at 20% 25%, rgba(217, 70, 239, 0.12), transparent 18%),
+    radial-gradient(circle at 78% 32%, rgba(192, 132, 252, 0.1), transparent 22%),
+    radial-gradient(circle at 55% 78%, rgba(103, 232, 249, 0.05), transparent 18%);
+  filter: blur(30px);
+  opacity: 0.82;
 }
 
 ::-webkit-scrollbar {

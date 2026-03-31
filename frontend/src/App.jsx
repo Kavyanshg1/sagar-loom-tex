@@ -217,14 +217,14 @@ function FlowNode({ active, label, subtitle, onClick }) {
     <button
       type="button"
       onClick={onClick}
-        className={`rounded-[26px] border p-5 text-left shadow-sm transition duration-200 ${
+      className={`rounded-[26px] border p-5 text-left shadow-sm transition duration-200 ${
         active
-          ? "border-fuchsia-400/40 bg-[linear-gradient(135deg,rgba(217,70,239,0.18),rgba(168,85,247,0.14))] text-white shadow-float"
+          ? "border-fuchsia-400/40 bg-[linear-gradient(135deg,rgba(74,16,120,0.92),rgba(20,18,50,0.96))] text-white shadow-float"
           : "border-line bg-panel hover:-translate-y-0.5 hover:border-slate-500 hover:bg-panelSoft hover:shadow-md"
       }`}
     >
       <div className="font-display text-lg font-bold tracking-[0.04em]">{label}</div>
-      <div className={`mt-2 text-sm ${active ? "text-slate-200" : "text-slate-400"}`}>
+      <div className={`mt-2 text-sm ${active ? "text-fuchsia-100/90" : "text-slate-400"}`}>
         {subtitle}
       </div>
     </button>
