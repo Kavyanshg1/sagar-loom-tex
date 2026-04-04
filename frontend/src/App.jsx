@@ -143,11 +143,11 @@ const config = {
 };
 
 const stockFields = [
-  { name: "white_yarn_kg", label: "Initial White Yarn at Shubham (kg)", type: "number" },
-  { name: "black_yarn_kg", label: "Initial Black Yarn at Shubham (kg)", type: "number" },
+  { name: "white_yarn_kg", label: "Opening White Yarn at Shubham (kg)", type: "number" },
+  { name: "black_yarn_kg", label: "Opening Black Yarn at Shubham (kg)", type: "number" },
   {
     name: "white_fabric_meters",
-    label: "Initial White Fabric at Sai Leela (meters)",
+    label: "Opening White Fabric at Sai Leela (meters)",
     type: "number",
   },
 ];
@@ -1002,7 +1002,7 @@ export default function App() {
                           onClick={() => openAdminModal("stock")}
                           className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-semibold transition hover:bg-panel"
                         >
-                          <span>Set Starting Stock</span>
+                          <span>Change Opening Stock</span>
                           <span className="text-slate-400">↗</span>
                         </button>
                         <button
@@ -1094,6 +1094,15 @@ export default function App() {
             </div>
           </div>
           <div className="grid gap-3 sm:flex sm:flex-row">
+            {authUser.role === "admin" ? (
+              <button
+                type="button"
+                onClick={() => openAdminModal("stock")}
+                className="rounded-2xl border border-fuchsia-500/30 bg-fuchsia-500/10 px-5 py-3 text-sm font-semibold text-fuchsia-100 shadow-sm transition hover:bg-fuchsia-500/15"
+              >
+                Change Opening Stock
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setShowExportPanel((current) => !current)}
@@ -1399,14 +1408,14 @@ export default function App() {
 
         <EntryModal
           open={adminModal === "stock"}
-          title="Set Starting Stock"
-          description="Set the opening yarn stock at Shubham and the opening fabric stock at Sai Leela. Existing balances will recalculate immediately."
+          title="Change Opening Stock"
+          description="Update the opening yarn stock at Shubham and the opening white-fabric stock at Sai Leela. Existing balances will recalculate immediately."
           fields={stockFields}
           values={adminForm}
           onChange={handleAdminFormChange}
           onClose={closeAdminModal}
           onSubmit={handleSetInitialStock}
-          submitLabel="Save Starting Stock"
+          submitLabel="Save Opening Stock"
           loading={adminLoading}
         >
           {adminError ? <p className="text-sm text-ember">{adminError}</p> : null}
