@@ -81,7 +81,7 @@ export function EntryModal({
       <div className="w-full max-w-2xl rounded-[32px] border border-line bg-night p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="font-display text-2xl font-bold tracking-[0.04em] text-white">{title}</h3>
+            <h3 className="font-display text-2xl font-bold tracking-[0.02em] text-white">{title}</h3>
             <p className="mt-2 text-sm text-slate-400">{description}</p>
           </div>
           <button

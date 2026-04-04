@@ -4,7 +4,7 @@ export function StatCard({ label, value, accent, subtitle }) {
       <div className={`mb-4 inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.24em] ${accent}`}>
         {label}
       </div>
-      <div className="font-display text-2xl font-extrabold tracking-[0.04em] text-white sm:text-3xl">{value}</div>
+      <div className="font-display text-2xl font-extrabold tracking-[0.02em] text-white sm:text-3xl">{value}</div>
       <div className="mt-2 text-sm text-slate-400">{subtitle}</div>
     </div>
   );

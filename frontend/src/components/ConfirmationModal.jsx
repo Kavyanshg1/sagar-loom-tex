@@ -15,7 +15,7 @@ export function ConfirmationModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/45 p-4 sm:items-center">
       <div className="w-full max-w-md rounded-[28px] border border-line bg-night p-6 shadow-2xl">
-        <h3 className="font-display text-xl font-bold tracking-[0.04em] text-white">{title}</h3>
+        <h3 className="font-display text-xl font-bold tracking-[0.02em] text-white">{title}</h3>
         <p className="mt-3 text-sm leading-6 text-slate-400">{description}</p>
         {children ? <div className="mt-4">{children}</div> : null}
 

@@ -223,7 +223,7 @@ function FlowNode({ active, label, subtitle, onClick }) {
           : "border-line bg-panel hover:-translate-y-0.5 hover:border-slate-500 hover:bg-panelSoft hover:shadow-md"
       }`}
     >
-      <div className="font-display text-lg font-bold tracking-[0.04em]">{label}</div>
+      <div className="font-display text-lg font-bold tracking-[0.02em]">{label}</div>
       <div className={`mt-2 text-sm ${active ? "text-fuchsia-100/90" : "text-slate-400"}`}>
         {subtitle}
       </div>
@@ -966,7 +966,7 @@ export default function App() {
                 className="mr-3 h-10 w-auto object-contain sm:mr-4 sm:h-14"
               />
               <div>
-                <h1 className="font-display text-xl font-bold tracking-[0.08em] text-white sm:text-3xl">
+                <h1 className="font-display text-xl font-bold tracking-[0.03em] text-white sm:text-3xl">
                   SAGAR LOOM TEX
                 </h1>
                 <p className="mt-1 text-xs text-blue-200 sm:text-base">
@@ -1126,7 +1126,7 @@ export default function App() {
           <section className="mt-4 rounded-[28px] border border-line bg-panel/95 p-4 shadow-float backdrop-blur sm:p-5">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div className="flex-1">
-                <h3 className="font-display text-lg font-bold tracking-[0.04em] text-white">Export production report</h3>
+                <h3 className="font-display text-lg font-bold tracking-[0.02em] text-white">Export production report</h3>
                 <p className="mt-1 text-sm text-slate-400">
                   Download a clean PDF report covering yarn purchases, processing, direct
                   transfers, and dyeing records for the selected period.
@@ -1197,7 +1197,7 @@ export default function App() {
           <SectionCard>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="font-display text-2xl font-bold tracking-[0.04em] text-white">{currentConfig.title}</h2>
+                <h2 className="font-display text-2xl font-bold tracking-[0.02em] text-white">{currentConfig.title}</h2>
                 <p className="mt-1 text-sm text-slate-400">{autoInsightMap[activeTab]}</p>
               </div>
               <div className="rounded-2xl border border-line bg-night px-4 py-3 text-sm text-slate-300">
@@ -1281,7 +1281,7 @@ export default function App() {
 
           <SectionCard className="flex flex-col gap-5">
             <div>
-              <h3 className="font-display text-xl font-bold tracking-[0.04em] text-white">
+              <h3 className="font-display text-xl font-bold tracking-[0.02em] text-white">
                 {isReadOnlyTab ? "How this table works" : "Entry options"}
               </h3>
               <p className="mt-2 text-sm text-slate-400">
@@ -1341,7 +1341,7 @@ export default function App() {
           <SectionCard>
               <div className="flex flex-col gap-3">
               <div>
-                <h3 className="font-display text-2xl font-bold tracking-[0.04em] text-white">Production Flow</h3>
+                <h3 className="font-display text-2xl font-bold tracking-[0.02em] text-white">Production Flow</h3>
                 <p className="mt-1 text-sm text-slate-400">
                   Click any node to inspect the simplified white-yarn and black-yarn routes from
                   purchase to final receipt at Sagar Loom Tex.

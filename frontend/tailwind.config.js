@@ -23,8 +23,8 @@ export default {
         float: "0 30px 90px rgba(5, 8, 22, 0.55)",
       },
       fontFamily: {
-        sans: ["Sora", "ui-sans-serif", "system-ui", "sans-serif"],
-        display: ["Orbitron", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["Manrope", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["Bodoni Moda", "ui-serif", "Georgia", "serif"],
       },
     },
   },

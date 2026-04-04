@@ -42,7 +42,7 @@ export function AuthScreen({
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-fuchsia-200">
                 Secure Operations
               </p>
-              <h2 className="mt-3 font-display text-3xl font-bold leading-tight tracking-[0.04em] text-white">
+              <h2 className="mt-3 font-display text-3xl font-bold leading-tight tracking-[0.02em] text-white">
                 Run yarn, processing, dyeing, and direct-transfer operations under one protected
                 workspace.
               </h2>
@@ -95,7 +95,7 @@ export function AuthScreen({
             </div>
 
             <div className="mt-6">
-              <h3 className="font-display text-2xl font-bold tracking-[0.04em] text-white">
+              <h3 className="font-display text-2xl font-bold tracking-[0.02em] text-white">
                 {mode === "login" ? "Welcome back" : "Create your workspace login"}
               </h3>
               <p className="mt-2 text-sm text-slate-400">

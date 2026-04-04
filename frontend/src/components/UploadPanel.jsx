@@ -11,7 +11,7 @@ export function UploadPanel({
     <div className="rounded-3xl border border-dashed border-line bg-panelSoft/70 p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h4 className="font-display text-base font-bold tracking-[0.04em] text-white">{title}</h4>
+          <h4 className="font-display text-base font-bold tracking-[0.02em] text-white">{title}</h4>
           <p className="mt-1 text-sm text-slate-400">
             Upload a {documentType} for OCR + AI-assisted extraction. The form stays editable,
             and nothing is saved until you confirm manually.
