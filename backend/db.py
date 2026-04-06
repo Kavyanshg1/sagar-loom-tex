@@ -120,6 +120,17 @@ def migrate_dyeing_records(connection: sqlite3.Connection) -> None:
     connection.execute("ALTER TABLE dyeing_records_new RENAME TO dyeing_records")
 
 
+
+
+def migrate_dyeing_remarks(connection: sqlite3.Connection) -> None:
+    columns = get_table_columns(connection, "dyeing_records")
+    if "remarks" in columns:
+        return
+
+    connection.execute(
+        "ALTER TABLE dyeing_records ADD COLUMN remarks TEXT NOT NULL DEFAULT ''"
+    )
+
 def migrate_yarn_purchases(connection: sqlite3.Connection) -> None:
     columns = get_table_columns(connection, "yarn_purchases")
     if "yarn_type" in columns:
@@ -189,6 +200,7 @@ def init_db() -> None:
         connection.executescript(SCHEMA_PATH.read_text())
         migrate_yarn_purchases(connection)
         migrate_dyeing_records(connection)
+        migrate_dyeing_remarks(connection)
         refresh_dyeing_balances(connection)
         refresh_sagar_receipts(connection)
         connection.commit()

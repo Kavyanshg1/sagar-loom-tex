@@ -263,7 +263,7 @@ def records():
             ),
             "dyeing_records": serialize_rows(
                 """
-                SELECT id, date, challan_number, fabric_dyed_meters, balance_meters, created_at
+                SELECT id, date, challan_number, fabric_dyed_meters, remarks, balance_meters, created_at
                 FROM dyeing_records
                 ORDER BY date DESC, id DESC
                 """
@@ -375,6 +375,7 @@ def export_pdf():
                     "Challan Number",
                     "Yarn Consumed (kg)",
                     "Wastage (kg)",
+                    "Net Consumed Yarn (kg)",
                     "Fabric Produced (meters)",
                 ],
                 report_data["processing_records"],
@@ -383,10 +384,11 @@ def export_pdf():
                     "challan_number",
                     "yarn_consumed_kg",
                     "wastage_kg",
+                    "net_consumed_yarn_kg",
                     "fabric_produced_meters",
                 ],
             ),
-            [0.75 * inch, 0.95 * inch, 0.9 * inch, 0.75 * inch, 1.45 * inch],
+            [0.65 * inch, 0.9 * inch, 0.8 * inch, 0.7 * inch, 0.95 * inch, 1.0 * inch],
         )
     )
     story.append(Spacer(1, 12))
@@ -400,6 +402,7 @@ def export_pdf():
                     "Challan Number",
                     "Yarn Consumed (kg)",
                     "Wastage (kg)",
+                    "Net Consumed Yarn (kg)",
                     "Fabric Produced (meters)",
                 ],
                 report_data["direct_processing_records"],
@@ -408,10 +411,11 @@ def export_pdf():
                     "challan_number",
                     "yarn_consumed_kg",
                     "wastage_kg",
+                    "net_consumed_yarn_kg",
                     "fabric_produced_meters",
                 ],
             ),
-            [0.75 * inch, 0.95 * inch, 0.9 * inch, 0.75 * inch, 1.45 * inch],
+            [0.65 * inch, 0.9 * inch, 0.8 * inch, 0.7 * inch, 0.95 * inch, 1.0 * inch],
         )
     )
     story.append(Spacer(1, 12))
@@ -420,11 +424,11 @@ def export_pdf():
     story.append(
         create_report_table(
             format_table_data(
-                ["Date", "Challan Number", "Fabric Dyed (meters)", "Balance (meters)"],
+                ["Date", "Challan Number", "Fabric Dyed (meters)", "Remarks", "Balance (meters)"],
                 report_data["dyeing_records"],
-                ["date", "challan_number", "fabric_dyed_meters", "balance_meters"],
+                ["date", "challan_number", "fabric_dyed_meters", "remarks", "balance_meters"],
             ),
-            [0.95 * inch, 1.25 * inch, 1.3 * inch, 1.2 * inch],
+            [0.7 * inch, 0.95 * inch, 0.9 * inch, 1.45 * inch, 0.85 * inch],
         )
     )
     story.append(Spacer(1, 12))

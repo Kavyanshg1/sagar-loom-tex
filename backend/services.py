@@ -77,7 +77,13 @@ def get_filtered_records(
     )
     processing_records = serialize_rows(
         f"""
-        SELECT date, challan_number, yarn_consumed_kg, wastage_kg, fabric_produced_meters
+        SELECT
+            date,
+            challan_number,
+            yarn_consumed_kg,
+            wastage_kg,
+            (yarn_consumed_kg + wastage_kg) AS net_consumed_yarn_kg,
+            fabric_produced_meters
         FROM processing_records{where_clause}
         ORDER BY date ASC, id ASC
         """,
@@ -85,7 +91,7 @@ def get_filtered_records(
     )
     dyeing_records = serialize_rows(
         f"""
-        SELECT date, challan_number, fabric_dyed_meters, balance_meters
+        SELECT date, challan_number, fabric_dyed_meters, remarks, balance_meters
         FROM dyeing_records{where_clause}
         ORDER BY date ASC, id ASC
         """,
@@ -93,7 +99,13 @@ def get_filtered_records(
     )
     direct_processing_records = serialize_rows(
         f"""
-        SELECT date, challan_number, yarn_consumed_kg, wastage_kg, fabric_produced_meters
+        SELECT
+            date,
+            challan_number,
+            yarn_consumed_kg,
+            wastage_kg,
+            (yarn_consumed_kg + wastage_kg) AS net_consumed_yarn_kg,
+            fabric_produced_meters
         FROM direct_processing_records{where_clause}
         ORDER BY date ASC, id ASC
         """,
@@ -627,13 +639,14 @@ def add_dyeing_record(payload: dict[str, Any]) -> dict[str, Any]:
         cursor = connection.execute(
             """
             INSERT INTO dyeing_records
-            (date, challan_number, fabric_dyed_meters, balance_meters)
-            VALUES (?, ?, ?, ?)
+            (date, challan_number, fabric_dyed_meters, remarks, balance_meters)
+            VALUES (?, ?, ?, ?, ?)
             """,
             (
                 payload["date"],
                 payload["challan_number"],
                 fabric_dyed,
+                str(payload.get("remarks", "")).strip(),
                 0,
             ),
         )
@@ -832,13 +845,14 @@ def update_dyeing_record(record_id: int, payload: dict[str, Any]) -> dict[str, A
         connection.execute(
             """
             UPDATE dyeing_records
-            SET date = ?, challan_number = ?, fabric_dyed_meters = ?
+            SET date = ?, challan_number = ?, fabric_dyed_meters = ?, remarks = ?
             WHERE id = ?
             """,
             (
                 payload["date"],
                 payload["challan_number"],
                 fabric_dyed,
+                str(payload.get("remarks", "")).strip(),
                 record_id,
             ),
         )

@@ -3,7 +3,7 @@ const TOKEN_STORAGE_KEY = "textile-flow-auth-token";
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, "");
 const API_BASE_URL =
   configuredBaseUrl ||
-  (window.location.port === "5173" ? "http://127.0.0.1:5000" : window.location.origin);
+  (window.location.port === "5173" ? "http://127.0.0.1:8000" : window.location.origin);
 
 function getStoredToken() {
   return window.localStorage.getItem(TOKEN_STORAGE_KEY);

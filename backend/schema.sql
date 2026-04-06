@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS dyeing_records (
     date TEXT NOT NULL,
     challan_number TEXT NOT NULL,
     fabric_dyed_meters REAL NOT NULL,
+    remarks TEXT NOT NULL DEFAULT '',
     balance_meters REAL NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

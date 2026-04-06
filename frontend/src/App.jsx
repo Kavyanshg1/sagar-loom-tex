@@ -31,6 +31,12 @@ const processingFields = [
   { name: "challan_number", label: "Challan Number" },
   { name: "yarn_consumed_kg", label: "Yarn Consumed (kg)", type: "number" },
   { name: "wastage_kg", label: "Wastage (kg)", type: "number", readOnly: true },
+  {
+    name: "net_consumed_yarn_kg",
+    label: "Net Consumed Yarn (kg)",
+    type: "number",
+    readOnly: true,
+  },
   { name: "fabric_produced_meters", label: "Fabric Produced (m)", type: "number" },
   { name: "yarn_balance_kg", label: "Yarn Balance (kg)", type: "number", readOnly: true },
 ];
@@ -40,8 +46,41 @@ const processingColumns = [
   { key: "challan_number", label: "Challan #" },
   { key: "yarn_consumed_kg", label: "Consumed (kg)" },
   { key: "wastage_kg", label: "Wastage (kg)" },
+  {
+    key: "net_consumed_yarn_kg",
+    label: "Net Consumed (kg)",
+    render: (value, row) => value ?? roundToTwo(Number(row.yarn_consumed_kg || 0) + Number(row.wastage_kg || 0)),
+  },
   { key: "fabric_produced_meters", label: "Fabric (m)" },
   { key: "yarn_balance_kg", label: "Yarn Balance (kg)" },
+];
+
+
+const shubhamIncomingColumns = [
+  { key: "date", label: "Date" },
+  { key: "invoice_number", label: "Invoice #" },
+  { key: "yarn_weight_kg", label: "Incoming Yarn (kg)" },
+  { key: "notes", label: "Notes" },
+];
+
+const saiIncomingColumns = [
+  { key: "date", label: "Date" },
+  { key: "challan_number", label: "Challan #" },
+  { key: "fabric_produced_meters", label: "Incoming Fabric (m)" },
+];
+
+const saiOutgoingColumns = [
+  { key: "date", label: "Date" },
+  { key: "challan_number", label: "Challan #" },
+  { key: "fabric_dyed_meters", label: "Outgoing Fabric (m)" },
+  { key: "remarks", label: "Remarks" },
+  { key: "balance_meters", label: "Balance (m)" },
+];
+
+const sagarIncomingColumns = [
+  { key: "date", label: "Date" },
+  { key: "challan_number", label: "Challan #" },
+  { key: "meters", label: "Incoming Fabric (m)" },
 ];
 
 const config = {
@@ -104,13 +143,9 @@ const config = {
       { name: "date", label: "Date", type: "date" },
       { name: "challan_number", label: "Challan Number" },
       { name: "fabric_dyed_meters", label: "Fabric Dyed (m)", type: "number" },
+      { name: "remarks", label: "Remarks (Shade Number - Meters)" },
     ],
-    tableColumns: [
-      { key: "date", label: "Date" },
-      { key: "challan_number", label: "Challan #" },
-      { key: "fabric_dyed_meters", label: "Fabric Dyed (m)" },
-      { key: "balance_meters", label: "Balance (m)" },
-    ],
+    tableColumns: saiOutgoingColumns,
     emptyMessage: "No dyeing records yet.",
   },
   "Shubham Black Yarn": {
@@ -132,12 +167,7 @@ const config = {
     searchKey: "challan_number",
     summaryLabel: "Incoming fabric",
     readOnly: true,
-    tableColumns: [
-      { key: "date", label: "Date" },
-      { key: "challan_number", label: "Challan #" },
-      { key: "fabric_type", label: "Type", render: (value) => String(value).toUpperCase() },
-      { key: "meters", label: "Meters" },
-    ],
+    tableColumns: sagarIncomingColumns,
     emptyMessage: "No incoming Sagar fabric records yet.",
   },
 };
@@ -172,6 +202,7 @@ function createDefaultValues() {
       challan_number: "",
       yarn_consumed_kg: "",
       wastage_kg: "",
+      net_consumed_yarn_kg: "",
       fabric_produced_meters: "",
       yarn_balance_kg: "",
     },
@@ -179,6 +210,7 @@ function createDefaultValues() {
       date: today,
       challan_number: "",
       fabric_dyed_meters: "",
+      remarks: "",
     },
     "Sagar Loom Tex Receipts": {},
     "Shubham Black Yarn": {
@@ -186,6 +218,7 @@ function createDefaultValues() {
       challan_number: "",
       yarn_consumed_kg: "",
       wastage_kg: "",
+      net_consumed_yarn_kg: "",
       fabric_produced_meters: "",
       yarn_balance_kg: "",
     },
@@ -210,6 +243,26 @@ function pickFormValues(tab, record) {
     nextValues[field.name] = record[field.name] ?? base[field.name] ?? "";
   });
   return nextValues;
+}
+
+
+function matchesSearch(row, searchKeys, searchTerm) {
+  if (!searchTerm) {
+    return true;
+  }
+
+  return searchKeys.some((key) => String(row[key] ?? "").toLowerCase().includes(searchTerm));
+}
+
+function sortRowsByDate(rows, direction) {
+  return [...rows].sort((left, right) => {
+    const leftDate = new Date(left.date).getTime();
+    const rightDate = new Date(right.date).getTime();
+    if (leftDate === rightDate) {
+      return direction === "asc" ? left.id - right.id : right.id - left.id;
+    }
+    return direction === "asc" ? leftDate - rightDate : rightDate - leftDate;
+  });
 }
 
 function FlowNode({ active, label, subtitle, onClick }) {
@@ -402,27 +455,128 @@ export default function App() {
     return () => document.removeEventListener("mousedown", handleDocumentClick);
   }, []);
 
-  const tableRows = useMemo(() => {
-    const rows = records[currentConfig.recordsKey] ?? [];
+  const visibleSections = useMemo(() => {
     const searchTerm = searchState[activeTab].trim().toLowerCase();
-    const filteredRows = rows.filter((row) => {
-      if (!searchTerm) {
-        return true;
-      }
-      return String(row[currentConfig.searchKey] ?? "").toLowerCase().includes(searchTerm);
-    });
+    const direction = sortState[activeTab];
 
-    return [...filteredRows].sort((left, right) => {
-      const leftDate = new Date(left.date).getTime();
-      const rightDate = new Date(right.date).getTime();
-      if (leftDate === rightDate) {
-        return sortState[activeTab] === "asc" ? left.id - right.id : right.id - left.id;
-      }
-      return sortState[activeTab] === "asc" ? leftDate - rightDate : rightDate - leftDate;
-    });
-  }, [activeTab, currentConfig.recordsKey, currentConfig.searchKey, records, searchState, sortState]);
+    const sectionsByTab = {
+      "Manglam Yarn Purchases": [
+        {
+          key: "purchases",
+          title: "All Purchases",
+          description: "All incoming yarn from Manglam Yarn Agencies.",
+          rows: records.yarn_purchases ?? [],
+          columns: currentConfig.tableColumns,
+          searchKeys: ["invoice_number", "notes", "yarn_type"],
+          editable: true,
+          emptyMessage: currentConfig.emptyMessage,
+        },
+      ],
+      "Shubham White Yarn": [
+        {
+          key: "incoming-white-yarn",
+          title: "Incoming",
+          description: "White yarn received from Manglam into the Shubham white branch.",
+          rows: (records.yarn_purchases ?? []).filter((row) => row.yarn_type === "white"),
+          columns: shubhamIncomingColumns,
+          searchKeys: ["invoice_number", "notes"],
+          editable: false,
+          emptyMessage: "No incoming white-yarn records yet.",
+        },
+        {
+          key: "outgoing-white-fabric",
+          title: "Outgoing",
+          description: "White-yarn challans leaving Shubham for Sai Leela.",
+          rows: records.processing_records ?? [],
+          columns: currentConfig.tableColumns,
+          searchKeys: ["challan_number"],
+          editable: true,
+          emptyMessage: currentConfig.emptyMessage,
+        },
+      ],
+      "Shubham Black Yarn": [
+        {
+          key: "incoming-black-yarn",
+          title: "Incoming",
+          description: "Black yarn received from Manglam into the Shubham black branch.",
+          rows: (records.yarn_purchases ?? []).filter((row) => row.yarn_type === "black"),
+          columns: shubhamIncomingColumns,
+          searchKeys: ["invoice_number", "notes"],
+          editable: false,
+          emptyMessage: "No incoming black-yarn records yet.",
+        },
+        {
+          key: "outgoing-black-fabric",
+          title: "Outgoing",
+          description: "Black-fabric challans leaving Shubham directly for Sagar Loom Tex.",
+          rows: records.direct_processing_records ?? [],
+          columns: currentConfig.tableColumns,
+          searchKeys: ["challan_number"],
+          editable: true,
+          emptyMessage: currentConfig.emptyMessage,
+        },
+      ],
+      "Sai Leela Processors": [
+        {
+          key: "incoming-white-fabric",
+          title: "Incoming",
+          description: "White fabric received from Shubham White Yarn.",
+          rows: records.processing_records ?? [],
+          columns: saiIncomingColumns,
+          searchKeys: ["challan_number"],
+          editable: false,
+          emptyMessage: "No incoming white-fabric records at Sai Leela yet.",
+        },
+        {
+          key: "outgoing-dyed-fabric",
+          title: "Outgoing",
+          description: "Dyed white fabric leaving Sai Leela for Sagar Loom Tex.",
+          rows: records.dyeing_records ?? [],
+          columns: currentConfig.tableColumns,
+          searchKeys: ["challan_number", "remarks"],
+          editable: true,
+          emptyMessage: currentConfig.emptyMessage,
+        },
+      ],
+      "Sagar Loom Tex Receipts": [
+        {
+          key: "incoming-white-sagar",
+          title: "Incoming White",
+          description: "White fabric arriving at Sagar from Sai Leela.",
+          rows: (records.sagar_receipts ?? []).filter((row) => row.fabric_type === "white"),
+          columns: sagarIncomingColumns,
+          searchKeys: ["challan_number"],
+          editable: false,
+          emptyMessage: "No incoming white-fabric receipts at Sagar yet.",
+        },
+        {
+          key: "incoming-black-sagar",
+          title: "Incoming Black",
+          description: "Black fabric arriving at Sagar directly from Shubham.",
+          rows: (records.sagar_receipts ?? []).filter((row) => row.fabric_type === "black"),
+          columns: sagarIncomingColumns,
+          searchKeys: ["challan_number"],
+          editable: false,
+          emptyMessage: "No incoming black-fabric receipts at Sagar yet.",
+        },
+      ],
+    };
 
-  const currentSelectedRows = tableRows.filter((row) => currentSelectedIds.includes(row.id));
+    return (sectionsByTab[activeTab] ?? []).map((section) => ({
+      ...section,
+      rows: sortRowsByDate(
+        section.rows.filter((row) => matchesSearch(row, section.searchKeys, searchTerm)),
+        direction,
+      ),
+    }));
+  }, [activeTab, currentConfig.tableColumns, records, searchState, sortState]);
+
+  const editableRows = useMemo(
+    () => visibleSections.filter((section) => section.editable).flatMap((section) => section.rows),
+    [visibleSections],
+  );
+
+  const currentSelectedRows = editableRows.filter((row) => currentSelectedIds.includes(row.id));
 
   function getCurrentFormValues(tab = activeTab) {
     const rawValues = formState[tab];
@@ -446,6 +600,7 @@ export default function App() {
     return {
       ...rawValues,
       wastage_kg: wastage,
+      net_consumed_yarn_kg: yarnConsumed ? roundToTwo(yarnConsumed + Number(wastage || 0)) : "",
       yarn_balance_kg: baseYarnBalance,
     };
   }
@@ -915,15 +1070,15 @@ export default function App() {
 
   const autoInsightMap = {
     "Manglam Yarn Purchases":
-      "Record black and white yarn separately so both Shubham stocks stay independent from purchase to output.",
+      "Record black and white yarn separately so each downstream branch has a clean incoming yarn history.",
     "Shubham White Yarn":
-      "White yarn at Shubham converts into unfinished white fabric, which then moves onward to Sai Leela for dyeing.",
+      "Track white-yarn incoming purchases separately from outgoing white-fabric challans sent onward to Sai Leela.",
     "Shubham Black Yarn":
-      "Black yarn at Shubham stays on a direct path to Sagar Loom Tex, with its own yarn balance and challan history.",
+      "Track black-yarn incoming purchases separately from outgoing black-fabric challans sent directly to Sagar Loom Tex.",
     "Sai Leela Processors":
-      "Sai Leela handles only the white-fabric branch. Balance is white fabric received from Shubham minus total dyed meters.",
+      "Track incoming white fabric from Shubham separately from outgoing dyed fabric sent onward, with remarks in shade-number format.",
     "Sagar Loom Tex Receipts":
-      "This table is auto-generated. White entries come from Sai Leela dyeing challans, and black entries come directly from Shubham black challans.",
+      "Sagar now shows separate incoming white and incoming black receipt tables so both branches remain independently auditable.",
   };
 
   const flowSummary = records.dashboard.flow_summary;
@@ -1219,16 +1374,12 @@ export default function App() {
             <div className="mt-6 flex flex-col gap-3 rounded-3xl border border-line bg-night px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),auto] md:items-center lg:flex-1">
                 <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
-                  <span>Search {currentConfig.searchKey.replaceAll("_", " ")}</span>
+                  <span>Search records</span>
                   <input
                     type="text"
                     value={searchState[activeTab]}
                     onChange={handleSearchChange}
-                    placeholder={
-                      currentConfig.searchKey === "invoice_number"
-                        ? "Search invoice number"
-                        : "Search challan number"
-                    }
+                    placeholder="Search invoice number, challan number, or remarks"
                     className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
                   />
                 </label>
@@ -1265,17 +1416,30 @@ export default function App() {
               ) : null}
             </div>
 
-            <div className="mt-6">
-              <RecordsTable
-                columns={currentConfig.tableColumns}
-                rows={tableRows}
-                emptyMessage={currentConfig.emptyMessage}
-                selectedRowIds={currentSelectedIds}
-                actionsEnabled={!isReadOnlyTab}
-                onSelectRecord={handleSelectRecord}
-                onEditRecord={openEditModal}
-                onDeleteRecord={(row) => openDeleteModal([row.id])}
-              />
+            <div className="mt-6 space-y-6">
+              {visibleSections.map((section) => (
+                <div key={section.key} className="space-y-3 rounded-[28px] border border-line bg-night/70 p-4">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <h4 className="text-lg font-bold text-white">{section.title}</h4>
+                      <p className="text-sm text-slate-400">{section.description}</p>
+                    </div>
+                    <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                      {section.rows.length} records
+                    </div>
+                  </div>
+                  <RecordsTable
+                    columns={section.columns}
+                    rows={section.rows}
+                    emptyMessage={section.emptyMessage}
+                    selectedRowIds={section.editable ? currentSelectedIds : []}
+                    actionsEnabled={section.editable}
+                    onSelectRecord={handleSelectRecord}
+                    onEditRecord={openEditModal}
+                    onDeleteRecord={(row) => openDeleteModal([row.id])}
+                  />
+                </div>
+              ))}
             </div>
           </SectionCard>
 
@@ -1483,8 +1647,8 @@ export default function App() {
           ) : null}
           {activeTab === "Sai Leela Processors" ? (
             <div className="rounded-3xl border border-line bg-night p-4 text-sm text-slate-300">
-              Sai Leela handles only the white branch. Balance is based on white fabric received
-              from Shubham White Yarn records minus dyed meters.
+              Sai Leela tracks incoming white fabric from Shubham and outgoing dyed fabric to
+              Sagar separately. Use remarks in the format: shade number - meters.
             </div>
           ) : null}
           {error ? <p className="text-sm text-ember">{error}</p> : null}
