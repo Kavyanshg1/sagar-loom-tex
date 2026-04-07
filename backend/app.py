@@ -504,7 +504,7 @@ def export_pdf():
         buffer,
         mimetype="application/pdf",
         as_attachment=True,
-        download_name=f"textile-production-report-{(selected_tab or "all").lower().replace(" ", "-")}-{range_type}.pdf",
+        download_name=f"textile-production-report-{(selected_tab or 'all').lower().replace(' ', '-')}-{range_type}.pdf",
     )
 
 
