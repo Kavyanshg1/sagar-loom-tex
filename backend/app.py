@@ -288,6 +288,7 @@ def export_pdf():
     range_type = request.args.get("range_type", "month")
     start_date = request.args.get("start_date")
     end_date = request.args.get("end_date")
+    selected_tab = request.args.get("tab")
 
     try:
         report_data = get_filtered_records(range_type, start_date, end_date)
@@ -353,97 +354,148 @@ def export_pdf():
     story.append(Paragraph(f"Range: {report_data['range_label']}", subtitle_style))
     story.append(Spacer(1, 12))
 
-    story.append(Paragraph("1. Yarn Purchases (Manglam Yarn Agencies)", section_style))
-    story.append(
-        create_report_table(
-            format_table_data(
-                ["Date", "Invoice Number", "Yarn Type", "Yarn Weight (kg)", "Notes"],
-                report_data["yarn_purchases"],
-                ["date", "invoice_number", "yarn_type", "yarn_weight_kg", "notes"],
-            ),
-            [0.75 * inch, 1.0 * inch, 0.75 * inch, 0.85 * inch, 2.1 * inch],
-        )
-    )
-    story.append(Spacer(1, 12))
+    available_tabs = {
+        "Manglam Yarn Purchases",
+        "Shubham White Yarn",
+        "Shubham Black Yarn",
+        "Sai Leela Processors",
+        "Sagar Loom Tex Receipts",
+    }
+    if selected_tab and selected_tab not in available_tabs:
+        return error("Invalid tab selection for export.")
 
-    story.append(Paragraph("2. Shubham White Yarn (To Sai Leela)", section_style))
-    story.append(
-        create_report_table(
-            format_table_data(
-                [
-                    "Date",
-                    "Challan Number",
-                    "Yarn Consumed (kg)",
-                    "Wastage (kg)",
-                    "Net Consumed Yarn (kg)",
-                    "Fabric Produced (meters)",
-                ],
-                report_data["processing_records"],
-                [
-                    "date",
-                    "challan_number",
-                    "yarn_consumed_kg",
-                    "wastage_kg",
-                    "net_consumed_yarn_kg",
-                    "fabric_produced_meters",
-                ],
-            ),
-            [0.65 * inch, 0.9 * inch, 0.8 * inch, 0.7 * inch, 0.95 * inch, 1.0 * inch],
-        )
-    )
-    story.append(Spacer(1, 12))
+    def include_tab(tab_name: str) -> bool:
+        return selected_tab in (None, "", tab_name)
 
-    story.append(Paragraph("3. Shubham Black Yarn (Direct To Sagar Loom Tex)", section_style))
-    story.append(
-        create_report_table(
-            format_table_data(
-                [
-                    "Date",
-                    "Challan Number",
-                    "Yarn Consumed (kg)",
-                    "Wastage (kg)",
-                    "Net Consumed Yarn (kg)",
-                    "Fabric Produced (meters)",
-                ],
-                report_data["direct_processing_records"],
-                [
-                    "date",
-                    "challan_number",
-                    "yarn_consumed_kg",
-                    "wastage_kg",
-                    "net_consumed_yarn_kg",
-                    "fabric_produced_meters",
-                ],
-            ),
-            [0.65 * inch, 0.9 * inch, 0.8 * inch, 0.7 * inch, 0.95 * inch, 1.0 * inch],
-        )
-    )
-    story.append(Spacer(1, 12))
+    stock_summary_map = {
+        "Shubham White Yarn": (
+            "Opening Stock",
+            f"{get_dashboard()['initial_white_yarn_stock_kg']} kg",
+            "Current Stock",
+            f"{get_dashboard()['white_yarn_with_shubham_kg']} kg",
+        ),
+        "Shubham Black Yarn": (
+            "Opening Stock",
+            f"{get_dashboard()['initial_black_yarn_stock_kg']} kg",
+            "Current Stock",
+            f"{get_dashboard()['black_yarn_with_shubham_kg']} kg",
+        ),
+        "Sai Leela Processors": (
+            "Opening Stock",
+            f"{get_dashboard()['initial_white_fabric_stock_meters']} m",
+            "Current Stock",
+            f"{get_dashboard()['white_fabric_with_sai_meters']} m",
+        ),
+    }
 
-    story.append(Paragraph("4. Dyeing Records (Sai Leela Processors)", section_style))
-    story.append(
-        create_report_table(
-            format_table_data(
-                ["Date", "Challan Number", "Fabric Dyed (meters)", "Remarks", "Balance (meters)"],
-                report_data["dyeing_records"],
-                ["date", "challan_number", "fabric_dyed_meters", "remarks", "balance_meters"],
-            ),
-            [0.7 * inch, 0.95 * inch, 0.9 * inch, 1.45 * inch, 0.85 * inch],
-        )
-    )
-    story.append(Spacer(1, 12))
+    def append_stock_summary(tab_name: str):
+        stock_summary = stock_summary_map.get(tab_name)
+        if not stock_summary:
+            return
+        opening_label, opening_value, current_label, current_value = stock_summary
+        story.append(Paragraph(f"{opening_label}: {opening_value}", subtitle_style))
+        story.append(Paragraph(f"{current_label}: {current_value}", subtitle_style))
+        story.append(Spacer(1, 8))
 
-    story.append(Paragraph("5. Fabric Incoming At Sagar Loom Tex", section_style))
-    story.append(
-        create_report_table(
-            format_table_data(
-                ["Date", "Challan Number", "Fabric Type", "Meters"],
-                report_data["sagar_receipts"],
-                ["date", "challan_number", "fabric_type", "meters"],
-            ),
-            [0.95 * inch, 1.45 * inch, 0.95 * inch, 0.95 * inch],
+    if include_tab("Manglam Yarn Purchases"):
+        story.append(Paragraph("1. Yarn Purchases (Manglam Yarn Agencies)", section_style))
+        story.append(
+            create_report_table(
+                format_table_data(
+                    ["Date", "Invoice Number", "Yarn Type", "Yarn Weight (kg)", "Notes"],
+                    report_data["yarn_purchases"],
+                    ["date", "invoice_number", "yarn_type", "yarn_weight_kg", "notes"],
+                ),
+                [0.75 * inch, 1.0 * inch, 0.75 * inch, 0.85 * inch, 2.1 * inch],
+            )
         )
-    )
+        story.append(Spacer(1, 12))
+
+    if include_tab("Shubham White Yarn"):
+        story.append(Paragraph("2. Shubham White Yarn (To Sai Leela)", section_style))
+        append_stock_summary("Shubham White Yarn")
+        story.append(
+            create_report_table(
+                format_table_data(
+                    [
+                        "Date",
+                        "Challan Number",
+                        "Yarn Consumed (kg)",
+                        "Wastage (kg)",
+                        "Net Consumed Yarn (kg)",
+                        "Fabric Produced (meters)",
+                    ],
+                    report_data["processing_records"],
+                    [
+                        "date",
+                        "challan_number",
+                        "yarn_consumed_kg",
+                        "wastage_kg",
+                        "net_consumed_yarn_kg",
+                        "fabric_produced_meters",
+                    ],
+                ),
+                [0.65 * inch, 0.9 * inch, 0.8 * inch, 0.7 * inch, 0.95 * inch, 1.0 * inch],
+            )
+        )
+        story.append(Spacer(1, 12))
+
+    if include_tab("Shubham Black Yarn"):
+        story.append(Paragraph("3. Shubham Black Yarn (Direct To Sagar Loom Tex)", section_style))
+        append_stock_summary("Shubham Black Yarn")
+        story.append(
+            create_report_table(
+                format_table_data(
+                    [
+                        "Date",
+                        "Challan Number",
+                        "Yarn Consumed (kg)",
+                        "Wastage (kg)",
+                        "Net Consumed Yarn (kg)",
+                        "Fabric Produced (meters)",
+                    ],
+                    report_data["direct_processing_records"],
+                    [
+                        "date",
+                        "challan_number",
+                        "yarn_consumed_kg",
+                        "wastage_kg",
+                        "net_consumed_yarn_kg",
+                        "fabric_produced_meters",
+                    ],
+                ),
+                [0.65 * inch, 0.9 * inch, 0.8 * inch, 0.7 * inch, 0.95 * inch, 1.0 * inch],
+            )
+        )
+        story.append(Spacer(1, 12))
+
+    if include_tab("Sai Leela Processors"):
+        story.append(Paragraph("4. Dyeing Records (Sai Leela Processors)", section_style))
+        append_stock_summary("Sai Leela Processors")
+        story.append(
+            create_report_table(
+                format_table_data(
+                    ["Date", "Challan Number", "Fabric Dyed (meters)", "Remarks", "Balance (meters)"],
+                    report_data["dyeing_records"],
+                    ["date", "challan_number", "fabric_dyed_meters", "remarks", "balance_meters"],
+                ),
+                [0.7 * inch, 0.95 * inch, 0.9 * inch, 1.45 * inch, 0.85 * inch],
+            )
+        )
+        story.append(Spacer(1, 12))
+
+    if include_tab("Sagar Loom Tex Receipts"):
+        story.append(Paragraph("5. Fabric Incoming At Sagar Loom Tex", section_style))
+        story.append(
+            create_report_table(
+                format_table_data(
+                    ["Date", "Challan Number", "Fabric Type", "Meters"],
+                    report_data["sagar_receipts"],
+                    ["date", "challan_number", "fabric_type", "meters"],
+                ),
+                [0.95 * inch, 1.45 * inch, 0.95 * inch, 0.95 * inch],
+            )
+        )
 
     doc.build(story)
     buffer.seek(0)
@@ -452,7 +504,7 @@ def export_pdf():
         buffer,
         mimetype="application/pdf",
         as_attachment=True,
-        download_name=f"textile-production-report-{range_type}.pdf",
+        download_name=f"textile-production-report-{(selected_tab or "all").lower().replace(" ", "-")}-{range_type}.pdf",
     )
 
 

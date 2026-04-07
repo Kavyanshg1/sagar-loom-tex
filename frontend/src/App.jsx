@@ -56,31 +56,42 @@ const processingColumns = [
 ];
 
 
-const shubhamIncomingColumns = [
+const manglamLedgerColumns = [
   { key: "date", label: "Date" },
-  { key: "invoice_number", label: "Invoice #" },
-  { key: "yarn_weight_kg", label: "Incoming Yarn (kg)" },
+  { key: "flow_direction", label: "Flow" },
+  { key: "reference_number", label: "Reference" },
+  { key: "yarn_type_label", label: "Yarn Type" },
+  { key: "incoming_kg", label: "Incoming (kg)" },
   { key: "notes", label: "Notes" },
 ];
 
-const saiIncomingColumns = [
+const shubhamLedgerColumns = [
   { key: "date", label: "Date" },
-  { key: "challan_number", label: "Challan #" },
-  { key: "fabric_produced_meters", label: "Incoming Fabric (m)" },
+  { key: "flow_direction", label: "Flow" },
+  { key: "reference_number", label: "Reference" },
+  { key: "incoming_kg", label: "Incoming Yarn (kg)" },
+  { key: "outgoing_kg", label: "Outgoing Net Yarn (kg)" },
+  { key: "fabric_meters", label: "Fabric (m)" },
+  { key: "balance_kg", label: "Balance (kg)" },
+  { key: "notes", label: "Notes" },
 ];
 
-const saiOutgoingColumns = [
+const saiLedgerColumns = [
   { key: "date", label: "Date" },
-  { key: "challan_number", label: "Challan #" },
-  { key: "fabric_dyed_meters", label: "Outgoing Fabric (m)" },
-  { key: "remarks", label: "Remarks" },
+  { key: "flow_direction", label: "Flow" },
+  { key: "reference_number", label: "Reference" },
+  { key: "incoming_meters", label: "Incoming (m)" },
+  { key: "outgoing_meters", label: "Outgoing (m)" },
   { key: "balance_meters", label: "Balance (m)" },
+  { key: "remarks", label: "Remarks" },
 ];
 
-const sagarIncomingColumns = [
+const sagarLedgerColumns = [
   { key: "date", label: "Date" },
-  { key: "challan_number", label: "Challan #" },
-  { key: "meters", label: "Incoming Fabric (m)" },
+  { key: "flow_direction", label: "Flow" },
+  { key: "reference_number", label: "Reference" },
+  { key: "incoming_meters", label: "Incoming (m)" },
+  { key: "notes", label: "Notes" },
 ];
 
 const config = {
@@ -108,13 +119,7 @@ const config = {
       { name: "yarn_weight_kg", label: "Yarn Weight (kg)", type: "number" },
       { name: "notes", label: "Notes" },
     ],
-    tableColumns: [
-      { key: "date", label: "Date" },
-      { key: "invoice_number", label: "Invoice #" },
-      { key: "yarn_type", label: "Yarn Type", render: (value) => String(value).toUpperCase() },
-      { key: "yarn_weight_kg", label: "Yarn (kg)" },
-      { key: "notes", label: "Notes" },
-    ],
+    tableColumns: manglamLedgerColumns,
     emptyMessage: "No yarn purchase records yet.",
   },
   "Shubham White Yarn": {
@@ -127,7 +132,7 @@ const config = {
     searchKey: "challan_number",
     summaryLabel: "White fabric sent to Sai",
     fields: processingFields,
-    tableColumns: processingColumns,
+    tableColumns: shubhamLedgerColumns,
     emptyMessage: "No white processing records yet.",
   },
   "Sai Leela Processors": {
@@ -145,7 +150,7 @@ const config = {
       { name: "fabric_dyed_meters", label: "Fabric Dyed (m)", type: "number" },
       { name: "remarks", label: "Remarks (Shade Number - Meters)" },
     ],
-    tableColumns: saiOutgoingColumns,
+    tableColumns: saiLedgerColumns,
     emptyMessage: "No dyeing records yet.",
   },
   "Shubham Black Yarn": {
@@ -158,7 +163,7 @@ const config = {
     searchKey: "challan_number",
     summaryLabel: "Black fabric sent to Sagar",
     fields: processingFields,
-    tableColumns: processingColumns,
+    tableColumns: shubhamLedgerColumns,
     emptyMessage: "No black processing records yet.",
   },
   "Sagar Loom Tex Receipts": {
@@ -167,7 +172,7 @@ const config = {
     searchKey: "challan_number",
     summaryLabel: "Incoming fabric",
     readOnly: true,
-    tableColumns: sagarIncomingColumns,
+    tableColumns: sagarLedgerColumns,
     emptyMessage: "No incoming Sagar fabric records yet.",
   },
 };
@@ -263,6 +268,52 @@ function sortRowsByDate(rows, direction) {
     }
     return direction === "asc" ? leftDate - rightDate : rightDate - leftDate;
   });
+}
+
+function getInitialRangeState(defaultValue = "lifetime") {
+  return Object.fromEntries(tabs.map((tab) => [tab, defaultValue]));
+}
+
+function getInitialCustomRangeState() {
+  return Object.fromEntries(tabs.map((tab) => [tab, { start_date: "", end_date: "" }]));
+}
+
+function isWithinDateRange(dateValue, rangeType, customRange) {
+  if (!dateValue) {
+    return false;
+  }
+
+  const rowDate = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(rowDate.getTime())) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (rangeType === "lifetime") {
+    return true;
+  }
+
+  if (rangeType === "custom") {
+    if (!customRange?.start_date || !customRange?.end_date) {
+      return true;
+    }
+    const startDate = new Date(`${customRange.start_date}T00:00:00`);
+    const endDate = new Date(`${customRange.end_date}T00:00:00`);
+    endDate.setHours(23, 59, 59, 999);
+    return rowDate >= startDate && rowDate <= endDate;
+  }
+
+  const startDate = new Date(today);
+  if (rangeType === "week") {
+    startDate.setDate(today.getDate() - 6);
+  } else if (rangeType === "month") {
+    startDate.setDate(today.getDate() - 29);
+  } else if (rangeType === "year") {
+    startDate.setDate(today.getDate() - 364);
+  }
+  return rowDate >= startDate && rowDate <= today;
 }
 
 function FlowNode({ active, label, subtitle, onClick }) {
@@ -364,6 +415,8 @@ export default function App() {
   const [sortState, setSortState] = useState(
     Object.fromEntries(tabs.map((tab) => [tab, "desc"])),
   );
+  const [viewRangeByTab, setViewRangeByTab] = useState(() => getInitialRangeState("lifetime"));
+  const [viewCustomRangeByTab, setViewCustomRangeByTab] = useState(getInitialCustomRangeState);
   const [activeFlowNode, setActiveFlowNode] = useState("shubhamWhite");
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [adminModal, setAdminModal] = useState(null);
@@ -387,7 +440,7 @@ export default function App() {
   const [uploading, setUploading] = useState(false);
   const [showExportPanel, setShowExportPanel] = useState(false);
   const [exportRange, setExportRange] = useState("month");
-  const [customRange, setCustomRange] = useState({ start_date: "", end_date: "" });
+  const [exportCustomRange, setExportCustomRange] = useState({ start_date: "", end_date: "" });
   const [error, setError] = useState("");
   const [uploadError, setUploadError] = useState("");
   const adminMenuRef = useRef(null);
@@ -455,128 +508,153 @@ export default function App() {
     return () => document.removeEventListener("mousedown", handleDocumentClick);
   }, []);
 
-  const visibleSections = useMemo(() => {
+  const currentViewRange = viewRangeByTab[activeTab] ?? "lifetime";
+  const currentViewCustomRange = viewCustomRangeByTab[activeTab] ?? { start_date: "", end_date: "" };
+
+  const tableRows = useMemo(() => {
     const searchTerm = searchState[activeTab].trim().toLowerCase();
     const direction = sortState[activeTab];
 
-    const sectionsByTab = {
-      "Manglam Yarn Purchases": [
-        {
-          key: "purchases",
-          title: "All Purchases",
-          description: "All incoming yarn from Manglam Yarn Agencies.",
-          rows: records.yarn_purchases ?? [],
-          columns: currentConfig.tableColumns,
-          searchKeys: ["invoice_number", "notes", "yarn_type"],
-          editable: true,
-          emptyMessage: currentConfig.emptyMessage,
-        },
-      ],
+    const ledgerRowsByTab = {
+      "Manglam Yarn Purchases": (records.yarn_purchases ?? []).map((row) => ({
+        rowKey: `yarn-${row.id}`,
+        id: row.id,
+        editable: true,
+        date: row.date,
+        flow_direction: "Incoming",
+        reference_number: row.invoice_number,
+        yarn_type_label: String(row.yarn_type ?? "").toUpperCase(),
+        incoming_kg: row.yarn_weight_kg,
+        notes: row.notes,
+        search_blob: [row.invoice_number, row.notes, row.yarn_type].join(" ").toLowerCase(),
+      })),
       "Shubham White Yarn": [
-        {
-          key: "incoming-white-yarn",
-          title: "Incoming",
-          description: "White yarn received from Manglam into the Shubham white branch.",
-          rows: (records.yarn_purchases ?? []).filter((row) => row.yarn_type === "white"),
-          columns: shubhamIncomingColumns,
-          searchKeys: ["invoice_number", "notes"],
-          editable: false,
-          emptyMessage: "No incoming white-yarn records yet.",
-        },
-        {
-          key: "outgoing-white-fabric",
-          title: "Outgoing",
-          description: "White-yarn challans leaving Shubham for Sai Leela.",
-          rows: records.processing_records ?? [],
-          columns: currentConfig.tableColumns,
-          searchKeys: ["challan_number"],
+        ...(records.yarn_purchases ?? [])
+          .filter((row) => row.yarn_type === "white")
+          .map((row) => ({
+            rowKey: `white-in-${row.id}`,
+            id: row.id,
+            editable: false,
+            date: row.date,
+            flow_direction: "Incoming",
+            reference_number: row.invoice_number,
+            incoming_kg: row.yarn_weight_kg,
+            outgoing_kg: "",
+            fabric_meters: "",
+            balance_kg: "",
+            notes: row.notes,
+            search_blob: [row.invoice_number, row.notes].join(" ").toLowerCase(),
+          })),
+        ...(records.processing_records ?? []).map((row) => ({
+          rowKey: `white-out-${row.id}`,
+          id: row.id,
           editable: true,
-          emptyMessage: currentConfig.emptyMessage,
-        },
+          date: row.date,
+          flow_direction: "Outgoing",
+          reference_number: row.challan_number,
+          incoming_kg: "",
+          outgoing_kg:
+            row.net_consumed_yarn_kg ?? roundToTwo(Number(row.yarn_consumed_kg || 0) + Number(row.wastage_kg || 0)),
+          fabric_meters: row.fabric_produced_meters,
+          balance_kg: row.yarn_balance_kg,
+          notes: `Wastage ${row.wastage_kg ?? 0} kg`,
+          search_blob: [row.challan_number].join(" ").toLowerCase(),
+        })),
       ],
       "Shubham Black Yarn": [
-        {
-          key: "incoming-black-yarn",
-          title: "Incoming",
-          description: "Black yarn received from Manglam into the Shubham black branch.",
-          rows: (records.yarn_purchases ?? []).filter((row) => row.yarn_type === "black"),
-          columns: shubhamIncomingColumns,
-          searchKeys: ["invoice_number", "notes"],
-          editable: false,
-          emptyMessage: "No incoming black-yarn records yet.",
-        },
-        {
-          key: "outgoing-black-fabric",
-          title: "Outgoing",
-          description: "Black-fabric challans leaving Shubham directly for Sagar Loom Tex.",
-          rows: records.direct_processing_records ?? [],
-          columns: currentConfig.tableColumns,
-          searchKeys: ["challan_number"],
+        ...(records.yarn_purchases ?? [])
+          .filter((row) => row.yarn_type === "black")
+          .map((row) => ({
+            rowKey: `black-in-${row.id}`,
+            id: row.id,
+            editable: false,
+            date: row.date,
+            flow_direction: "Incoming",
+            reference_number: row.invoice_number,
+            incoming_kg: row.yarn_weight_kg,
+            outgoing_kg: "",
+            fabric_meters: "",
+            balance_kg: "",
+            notes: row.notes,
+            search_blob: [row.invoice_number, row.notes].join(" ").toLowerCase(),
+          })),
+        ...(records.direct_processing_records ?? []).map((row) => ({
+          rowKey: `black-out-${row.id}`,
+          id: row.id,
           editable: true,
-          emptyMessage: currentConfig.emptyMessage,
-        },
+          date: row.date,
+          flow_direction: "Outgoing",
+          reference_number: row.challan_number,
+          incoming_kg: "",
+          outgoing_kg:
+            row.net_consumed_yarn_kg ?? roundToTwo(Number(row.yarn_consumed_kg || 0) + Number(row.wastage_kg || 0)),
+          fabric_meters: row.fabric_produced_meters,
+          balance_kg: row.yarn_balance_kg,
+          notes: `Wastage ${row.wastage_kg ?? 0} kg`,
+          search_blob: [row.challan_number].join(" ").toLowerCase(),
+        })),
       ],
       "Sai Leela Processors": [
-        {
-          key: "incoming-white-fabric",
-          title: "Incoming",
-          description: "White fabric received from Shubham White Yarn.",
-          rows: records.processing_records ?? [],
-          columns: saiIncomingColumns,
-          searchKeys: ["challan_number"],
+        ...(records.processing_records ?? []).map((row) => ({
+          rowKey: `sai-in-${row.id}`,
+          id: row.id,
           editable: false,
-          emptyMessage: "No incoming white-fabric records at Sai Leela yet.",
-        },
-        {
-          key: "outgoing-dyed-fabric",
-          title: "Outgoing",
-          description: "Dyed white fabric leaving Sai Leela for Sagar Loom Tex.",
-          rows: records.dyeing_records ?? [],
-          columns: currentConfig.tableColumns,
-          searchKeys: ["challan_number", "remarks"],
+          date: row.date,
+          flow_direction: "Incoming",
+          reference_number: row.challan_number,
+          incoming_meters: row.fabric_produced_meters,
+          outgoing_meters: "",
+          balance_meters: "",
+          remarks: "From Shubham White Yarn",
+          search_blob: [row.challan_number].join(" ").toLowerCase(),
+        })),
+        ...(records.dyeing_records ?? []).map((row) => ({
+          rowKey: `sai-out-${row.id}`,
+          id: row.id,
           editable: true,
-          emptyMessage: currentConfig.emptyMessage,
-        },
+          date: row.date,
+          flow_direction: "Outgoing",
+          reference_number: row.challan_number,
+          incoming_meters: "",
+          outgoing_meters: row.fabric_dyed_meters,
+          balance_meters: row.balance_meters,
+          remarks: row.remarks,
+          search_blob: [row.challan_number, row.remarks].join(" ").toLowerCase(),
+        })),
       ],
-      "Sagar Loom Tex Receipts": [
-        {
-          key: "incoming-white-sagar",
-          title: "Incoming White",
-          description: "White fabric arriving at Sagar from Sai Leela.",
-          rows: (records.sagar_receipts ?? []).filter((row) => row.fabric_type === "white"),
-          columns: sagarIncomingColumns,
-          searchKeys: ["challan_number"],
-          editable: false,
-          emptyMessage: "No incoming white-fabric receipts at Sagar yet.",
-        },
-        {
-          key: "incoming-black-sagar",
-          title: "Incoming Black",
-          description: "Black fabric arriving at Sagar directly from Shubham.",
-          rows: (records.sagar_receipts ?? []).filter((row) => row.fabric_type === "black"),
-          columns: sagarIncomingColumns,
-          searchKeys: ["challan_number"],
-          editable: false,
-          emptyMessage: "No incoming black-fabric receipts at Sagar yet.",
-        },
-      ],
+      "Sagar Loom Tex Receipts": (records.sagar_receipts ?? []).map((row) => ({
+        rowKey: `sagar-${row.id}`,
+        id: row.id,
+        editable: false,
+        date: row.date,
+        flow_direction: row.fabric_type === "white" ? "Incoming White" : "Incoming Black",
+        reference_number: row.challan_number,
+        incoming_meters: row.meters,
+        notes: row.fabric_type === "white" ? "From Sai Leela" : "Direct from Shubham",
+        search_blob: [row.challan_number, row.fabric_type].join(" ").toLowerCase(),
+      })),
     };
 
-    return (sectionsByTab[activeTab] ?? []).map((section) => ({
-      ...section,
-      rows: sortRowsByDate(
-        section.rows.filter((row) => matchesSearch(row, section.searchKeys, searchTerm)),
-        direction,
+    return sortRowsByDate(
+      (ledgerRowsByTab[activeTab] ?? []).filter(
+        (row) =>
+          isWithinDateRange(row.date, currentViewRange, currentViewCustomRange) &&
+          (!searchTerm || row.search_blob.includes(searchTerm)),
       ),
-    }));
-  }, [activeTab, currentConfig.tableColumns, records, searchState, sortState]);
+      direction,
+    );
+  }, [
+    activeTab,
+    currentViewCustomRange,
+    currentViewRange,
+    records,
+    searchState,
+    sortState,
+  ]);
 
-  const editableRows = useMemo(
-    () => visibleSections.filter((section) => section.editable).flatMap((section) => section.rows),
-    [visibleSections],
+  const currentSelectedRows = tableRows.filter(
+    (row) => row.editable && currentSelectedIds.includes(row.rowKey ?? String(row.id)),
   );
-
-  const currentSelectedRows = editableRows.filter((row) => currentSelectedIds.includes(row.id));
 
   function getCurrentFormValues(tab = activeTab) {
     const rawValues = formState[tab];
@@ -697,9 +775,27 @@ export default function App() {
     }));
   }
 
-  function handleCustomDateChange(event) {
+  function handleViewRangeChange(rangeType) {
+    setViewRangeByTab((current) => ({
+      ...current,
+      [activeTab]: rangeType,
+    }));
+  }
+
+  function handleViewCustomDateChange(event) {
     const { name, value } = event.target;
-    setCustomRange((current) => ({
+    setViewCustomRangeByTab((current) => ({
+      ...current,
+      [activeTab]: {
+        ...current[activeTab],
+        [name]: value,
+      },
+    }));
+  }
+
+  function handleExportCustomDateChange(event) {
+    const { name, value } = event.target;
+    setExportCustomRange((current) => ({
       ...current,
       [name]: value,
     }));
@@ -930,11 +1026,15 @@ export default function App() {
   }
 
   function handleSelectRecord(row) {
+    if (isReadOnlyTab || !row.editable) {
+      return;
+    }
+
     setSelectedRecords((current) => ({
       ...current,
-      [activeTab]: current[activeTab].includes(row.id)
+      [activeTab]: current[activeTab].includes(row.rowKey ?? String(row.id))
         ? current[activeTab]
-        : [...current[activeTab], row.id],
+        : [...current[activeTab], row.rowKey ?? String(row.id)],
     }));
   }
 
@@ -945,29 +1045,56 @@ export default function App() {
     openEditModal(currentSelectedRows[0]);
   }
 
+  async function blobToBase64(blob) {
+    const arrayBuffer = await blob.arrayBuffer();
+    let binary = "";
+    const bytes = new Uint8Array(arrayBuffer);
+    const chunkSize = 0x8000;
+    for (let index = 0; index < bytes.length; index += chunkSize) {
+      const chunk = bytes.subarray(index, index + chunkSize);
+      binary += String.fromCharCode(...chunk);
+    }
+    return window.btoa(binary);
+  }
+
   async function handleExportPdf() {
     setExporting(true);
     setError("");
 
     try {
-      const params = new URLSearchParams({ range_type: exportRange });
+      const params = new URLSearchParams({ range_type: exportRange, tab: activeTab });
       if (exportRange === "custom") {
-        if (!customRange.start_date || !customRange.end_date) {
+        if (!exportCustomRange.start_date || !exportCustomRange.end_date) {
           throw new Error("Select both start and end dates for a custom PDF export.");
         }
-        params.set("start_date", customRange.start_date);
-        params.set("end_date", customRange.end_date);
+        params.set("start_date", exportCustomRange.start_date);
+        params.set("end_date", exportCustomRange.end_date);
       }
 
       const blob = await api.exportPdf(params.toString());
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `textile-production-report-${exportRange}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const fileTab = activeTab.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const fileName = `textile-production-report-${fileTab}-${exportRange}.pdf`;
+
+      if (window.pywebview?.api?.save_pdf) {
+        const encodedPdf = await blobToBase64(blob);
+        const result = await window.pywebview.api.save_pdf(encodedPdf, fileName);
+        if (result?.cancelled) {
+          setExporting(false);
+          return;
+        }
+      } else {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.target = "_blank";
+        link.rel = "noopener";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      }
+
       setShowExportPanel(false);
     } catch (requestError) {
       handleApiError(requestError);
@@ -1082,6 +1209,32 @@ export default function App() {
   };
 
   const flowSummary = records.dashboard.flow_summary;
+  const stockSummaryByTab = {
+    "Shubham White Yarn": {
+      unit: "kg",
+      openingLabel: "Opening Stock",
+      currentLabel: "Current Stock",
+      openingValue: records.dashboard.initial_white_yarn_stock_kg,
+      currentValue: records.dashboard.white_yarn_with_shubham_kg,
+    },
+    "Shubham Black Yarn": {
+      unit: "kg",
+      openingLabel: "Opening Stock",
+      currentLabel: "Current Stock",
+      openingValue: records.dashboard.initial_black_yarn_stock_kg,
+      currentValue: records.dashboard.black_yarn_with_shubham_kg,
+    },
+    "Sai Leela Processors": {
+      unit: "m",
+      openingLabel: "Opening Stock",
+      currentLabel: "Current Stock",
+      openingValue: records.dashboard.initial_white_fabric_stock_meters,
+      currentValue: records.dashboard.white_fabric_with_sai_meters,
+    },
+  };
+
+  const currentStockSummary = stockSummaryByTab[activeTab] ?? null;
+
   const flowNodeDetails = {
     manglam: [
       `White yarn purchased: ${formatMetric(flowSummary.manglam.white_yarn_purchased_kg, "kg")}`,
@@ -1281,10 +1434,9 @@ export default function App() {
           <section className="mt-4 rounded-[28px] border border-line bg-panel/95 p-4 shadow-float backdrop-blur sm:p-5">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div className="flex-1">
-                <h3 className="font-display text-lg font-bold tracking-[0.02em] text-white">Export production report</h3>
+                <h3 className="font-display text-lg font-bold tracking-[0.02em] text-white">Export {currentConfig.title} PDF</h3>
                 <p className="mt-1 text-sm text-slate-400">
-                  Download a clean PDF report covering yarn purchases, processing, direct
-                  transfers, and dyeing records for the selected period.
+                  Download a PDF for only the currently active tab and selected export period.
                 </p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-5">
                   {exportOptions.map((option) => (
@@ -1309,8 +1461,8 @@ export default function App() {
                       <input
                         type="date"
                         name="start_date"
-                        value={customRange.start_date}
-                        onChange={handleCustomDateChange}
+                        value={exportCustomRange.start_date}
+                        onChange={handleExportCustomDateChange}
                         className="rounded-2xl border border-line bg-night px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
                       />
                     </label>
@@ -1319,8 +1471,8 @@ export default function App() {
                       <input
                         type="date"
                         name="end_date"
-                        value={customRange.end_date}
-                        onChange={handleCustomDateChange}
+                        value={exportCustomRange.end_date}
+                        onChange={handleExportCustomDateChange}
                         className="rounded-2xl border border-line bg-night px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
                       />
                     </label>
@@ -1371,28 +1523,36 @@ export default function App() {
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col gap-3 rounded-3xl border border-line bg-night px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),auto] md:items-center lg:flex-1">
-                <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
-                  <span>Search records</span>
-                  <input
-                    type="text"
-                    value={searchState[activeTab]}
-                    onChange={handleSearchChange}
-                    placeholder="Search invoice number, challan number, or remarks"
-                    className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={toggleSortDirection}
-                  className="rounded-2xl bg-panelSoft px-4 py-3 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-panel"
-                >
-                  Sort by Date: {sortState[activeTab] === "desc" ? "Newest" : "Oldest"}
-                </button>
-              </div>
+            <div className="mt-6 space-y-4 rounded-3xl border border-line bg-night px-4 py-4">
+              {currentStockSummary ? (
+                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-50">
+                  <span className="font-semibold">{currentStockSummary.openingLabel}:</span>{" "}
+                  {formatMetric(currentStockSummary.openingValue, currentStockSummary.unit)}
+                </div>
+              ) : null}
 
-              {!isReadOnlyTab && currentSelectedIds.length > 0 ? (
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr),auto] md:items-center xl:flex-1">
+                  <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
+                    <span>Search records</span>
+                    <input
+                      type="text"
+                      value={searchState[activeTab]}
+                      onChange={handleSearchChange}
+                      placeholder="Search invoice number, challan number, or remarks"
+                      className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={toggleSortDirection}
+                    className="rounded-2xl bg-panelSoft px-4 py-3 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-panel"
+                  >
+                    Sort by Date: {sortState[activeTab] === "desc" ? "Newest" : "Oldest"}
+                  </button>
+                </div>
+
+                {currentSelectedRows.length > 0 ? (
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center lg:justify-end">
                   <div className="text-sm font-semibold text-white">
                     Selected: {currentSelectedIds.length} records
@@ -1407,7 +1567,7 @@ export default function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => openDeleteModal(currentSelectedIds)}
+                    onClick={() => openDeleteModal(currentSelectedRows.map((row) => row.id))}
                     className="rounded-2xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700"
                   >
                     Delete
@@ -1416,30 +1576,81 @@ export default function App() {
               ) : null}
             </div>
 
-            <div className="mt-6 space-y-6">
-              {visibleSections.map((section) => (
-                <div key={section.key} className="space-y-3 rounded-[28px] border border-line bg-night/70 p-4">
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <h4 className="text-lg font-bold text-white">{section.title}</h4>
-                      <p className="text-sm text-slate-400">{section.description}</p>
-                    </div>
-                    <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                      {section.rows.length} records
-                    </div>
-                  </div>
-                  <RecordsTable
-                    columns={section.columns}
-                    rows={section.rows}
-                    emptyMessage={section.emptyMessage}
-                    selectedRowIds={section.editable ? currentSelectedIds : []}
-                    actionsEnabled={section.editable}
-                    onSelectRecord={handleSelectRecord}
-                    onEditRecord={openEditModal}
-                    onDeleteRecord={(row) => openDeleteModal([row.id])}
-                  />
+              <div className="flex flex-wrap gap-3">
+                {exportOptions.map((option) => (
+                  <button
+                    key={`view-${option.value}`}
+                    type="button"
+                    onClick={() => handleViewRangeChange(option.value)}
+                    className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                      currentViewRange === option.value
+                        ? "bg-[linear-gradient(135deg,rgba(217,70,239,0.96),rgba(168,85,247,0.96))] text-white shadow-lg"
+                        : "border border-line bg-panelSoft/65 text-slate-300 hover:bg-panel"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              {currentViewRange === "custom" ? (
+                <div className="grid gap-4 md:max-w-xl md:grid-cols-2">
+                  <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
+                    <span>View Start Date</span>
+                    <input
+                      type="date"
+                      name="start_date"
+                      value={currentViewCustomRange.start_date}
+                      onChange={handleViewCustomDateChange}
+                      className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm font-medium text-slate-300">
+                    <span>View End Date</span>
+                    <input
+                      type="date"
+                      name="end_date"
+                      value={currentViewCustomRange.end_date}
+                      onChange={handleViewCustomDateChange}
+                      className="rounded-2xl border border-line bg-panel px-4 py-3 text-sm text-slate-100 outline-none transition focus:border-glow focus:ring-2 focus:ring-fuchsia-500/20"
+                    />
+                  </label>
                 </div>
-              ))}
+              ) : null}
+
+            </div>
+
+            <div className="mt-6 space-y-6">
+              <div className="space-y-3 rounded-[28px] border border-line bg-night/70 p-4">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h4 className="text-lg font-bold text-white">Ledger View</h4>
+                    <p className="text-sm text-slate-400">
+                      Incoming and outgoing entries are shown together in one datewise ledger.
+                    </p>
+                  </div>
+                  <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                    {tableRows.length} records
+                  </div>
+                </div>
+                <RecordsTable
+                  columns={currentConfig.tableColumns}
+                  rows={tableRows}
+                  emptyMessage={currentConfig.emptyMessage}
+                  selectedRowIds={currentSelectedIds}
+                  actionsEnabled={!isReadOnlyTab}
+                  isRowActionable={(row) => Boolean(row.editable) && !isReadOnlyTab}
+                  onSelectRecord={handleSelectRecord}
+                  onEditRecord={openEditModal}
+                  onDeleteRecord={(row) => openDeleteModal([row.id])}
+                />
+                {currentStockSummary ? (
+                  <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-50">
+                    <span className="font-semibold">{currentStockSummary.currentLabel}:</span>{" "}
+                    {formatMetric(currentStockSummary.currentValue, currentStockSummary.unit)}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </SectionCard>
 
@@ -1458,12 +1669,10 @@ export default function App() {
             {isReadOnlyTab ? (
               <div className="rounded-3xl border border-cyan-500/20 bg-cyan-500/10 p-5">
                 <div className="text-sm font-bold uppercase tracking-[0.24em] text-cyan-100">
-                  Automatic receipts
+                  {isReadOnlyTab ? "Automatic receipts" : "Derived incoming ledger"}
                 </div>
                 <p className="mt-2 text-sm text-slate-300">
-                  White receipts are generated from Sai Leela dyeing entries and black receipts are
-                  generated from Shubham black-yarn records using the same challan number, date,
-                  and meters.
+                  {"White receipts are generated from Sai Leela dyeing entries and black receipts are generated from Shubham black-yarn records using the same challan number, date, and meters."}
                 </p>
               </div>
             ) : (

@@ -9,3 +9,5 @@ pdfplumber==0.11.5
 pillow==12.1.1
 pytesseract==0.3.13
 reportlab==4.2.5
+
+pywebview==5.4

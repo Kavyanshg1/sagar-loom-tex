@@ -56,9 +56,12 @@ export function RecordsTable({
   onEditRecord,
   onDeleteRecord,
   actionsEnabled = true,
+  isRowActionable = null,
 }) {
   const [openMenuRowId, setOpenMenuRowId] = useState(null);
   const containerRef = useRef(null);
+  const rowIsActionable = (row) =>
+    typeof isRowActionable === "function" ? isRowActionable(row) : Boolean(actionsEnabled);
   const primaryColumn = columns[0];
   const secondaryColumn = columns[1];
   const detailColumns = columns.slice(2);
@@ -82,9 +85,9 @@ export function RecordsTable({
         ) : (
           rows.map((row) => (
             <div
-              key={row.id}
+              key={row.rowKey ?? row.id}
               className={`p-4 transition ${
-                selectedRowIds.includes(row.id)
+                selectedRowIds.includes(row.rowKey ?? row.id)
                   ? "bg-orange-500/10 ring-1 ring-inset ring-orange-400/40"
                   : "bg-panel"
               }`}
@@ -106,7 +109,7 @@ export function RecordsTable({
                   ) : null}
                 </div>
                 <ActionsMenu
-                  actionsEnabled={actionsEnabled}
+                  actionsEnabled={rowIsActionable(row)}
                   isOpen={openMenuRowId === row.id}
                   onToggle={() =>
                     setOpenMenuRowId((current) => (current === row.id ? null : row.id))
@@ -123,14 +126,14 @@ export function RecordsTable({
                     onDeleteRecord(row);
                     setOpenMenuRowId(null);
                   }}
-                  selected={selectedRowIds.includes(row.id)}
+                  selected={selectedRowIds.includes(row.rowKey ?? row.id)}
                 />
               </div>
 
               {detailColumns.length > 0 ? (
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {detailColumns.map((column) => (
-                    <div key={`${row.id}-${column.key}`} className="rounded-2xl bg-night px-3 py-3">
+                    <div key={`${row.rowKey ?? row.id}-${column.key}`} className="rounded-2xl bg-night px-3 py-3">
                       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
                         {column.label}
                       </div>
@@ -178,22 +181,22 @@ export function RecordsTable({
             ) : (
               rows.map((row) => (
                 <tr
-                  key={row.id}
+                  key={row.rowKey ?? row.id}
                   className={`transition ${
-                    selectedRowIds.includes(row.id)
+                    selectedRowIds.includes(row.rowKey ?? row.id)
                       ? "bg-orange-500/10 ring-1 ring-inset ring-orange-400/40"
                       : "hover:bg-panelSoft"
                   }`}
                 >
                   {columns.map((column) => (
-                    <td key={`${row.id}-${column.key}`} className="px-4 py-3 text-slate-200">
+                    <td key={`${row.rowKey ?? row.id}-${column.key}`} className="px-4 py-3 text-slate-200">
                       {column.render ? column.render(row[column.key], row) : row[column.key]}
                     </td>
                   ))}
                   {actionsEnabled ? (
                     <td className="px-4 py-3 text-right">
                       <ActionsMenu
-                        actionsEnabled={actionsEnabled}
+                        actionsEnabled={rowIsActionable(row)}
                         isOpen={openMenuRowId === row.id}
                         onToggle={() =>
                           setOpenMenuRowId((current) => (current === row.id ? null : row.id))
@@ -210,7 +213,7 @@ export function RecordsTable({
                           onDeleteRecord(row);
                           setOpenMenuRowId(null);
                         }}
-                        selected={selectedRowIds.includes(row.id)}
+                        selected={selectedRowIds.includes(row.rowKey ?? row.id)}
                       />
                     </td>
                   ) : null}
