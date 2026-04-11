@@ -89,14 +89,26 @@ def get_filtered_records(
         """,
         params,
     )
-    dyeing_records = serialize_rows(
-        f"""
-        SELECT date, challan_number, fabric_dyed_meters, remarks, balance_meters
-        FROM dyeing_records{where_clause}
-        ORDER BY date ASC, id ASC
-        """,
-        params,
-    )
+    with get_connection() as connection:
+        dyeing_balance_map = compute_dyeing_balance_map(connection)
+        dyeing_rows = connection.execute(
+            f"""
+            SELECT id, date, challan_number, fabric_dyed_meters, remarks, balance_meters
+            FROM dyeing_records{where_clause}
+            ORDER BY date ASC, id ASC
+            """,
+            params,
+        ).fetchall()
+    dyeing_records = [
+        {
+            "date": row["date"],
+            "challan_number": row["challan_number"],
+            "fabric_dyed_meters": row["fabric_dyed_meters"],
+            "remarks": row["remarks"],
+            "balance_meters": dyeing_balance_map.get(row["id"], row["balance_meters"]),
+        }
+        for row in dyeing_rows
+    ]
     direct_processing_records = serialize_rows(
         f"""
         SELECT
@@ -545,27 +557,94 @@ def recompute_processing_balances(connection) -> None:
 
 
 def recompute_dyeing_balances(connection) -> None:
-    total_produced = fetch_total_processing_fabric(connection) + (
-        fetch_config_number(connection, INITIAL_WHITE_FABRIC_KEY)
-        or fetch_config_number(connection, LEGACY_INITIAL_FABRIC_KEY)
-    )
-
-    rows = connection.execute(
-        """
-        SELECT id, fabric_dyed_meters
-        FROM dyeing_records
-        ORDER BY date ASC, id ASC
-        """
-    ).fetchall()
-
-    cumulative_dyed = 0.0
+    balance_map = compute_dyeing_balance_map(connection)
+    rows = connection.execute("SELECT id FROM dyeing_records").fetchall()
     for row in rows:
-        cumulative_dyed = round(cumulative_dyed + float(row["fabric_dyed_meters"]), 2)
-        balance = round(total_produced - cumulative_dyed, 2)
         connection.execute(
             "UPDATE dyeing_records SET balance_meters = ? WHERE id = ?",
-            (balance, row["id"]),
+            (balance_map.get(row["id"], 0.0), row["id"]),
         )
+
+
+def compute_dyeing_balance_map(connection) -> dict[int, float]:
+    opening_stock = resolve_stock_value(
+        connection, INITIAL_WHITE_FABRIC_KEY, LEGACY_INITIAL_FABRIC_KEY
+    )
+
+    events: list[tuple[str, str, int, int, float]] = []
+
+    for row in connection.execute(
+        """
+        SELECT id, date, created_at, fabric_produced_meters
+        FROM processing_records
+        ORDER BY date ASC, created_at ASC, id ASC
+        """
+    ).fetchall():
+        events.append(
+            (
+                str(row["date"] or ""),
+                str(row["created_at"] or ""),
+                0,
+                int(row["id"]),
+                round(float(row["fabric_produced_meters"] or 0), 2),
+            )
+        )
+
+    for row in connection.execute(
+        """
+        SELECT id, date, created_at, fabric_dyed_meters
+        FROM dyeing_records
+        ORDER BY date ASC, created_at ASC, id ASC
+        """
+    ).fetchall():
+        events.append(
+            (
+                str(row["date"] or ""),
+                str(row["created_at"] or ""),
+                1,
+                int(row["id"]),
+                round(float(row["fabric_dyed_meters"] or 0), 2),
+            )
+        )
+
+    events.sort(key=lambda item: (item[0], item[1], item[2], item[3]))
+
+    running_balance = round(opening_stock, 2)
+    balance_map: dict[int, float] = {}
+
+    for _, _, event_type, record_id, amount in events:
+        if event_type == 0:
+            running_balance = round(running_balance + amount, 2)
+        else:
+            running_balance = round(running_balance - amount, 2)
+            balance_map[record_id] = running_balance
+
+    return balance_map
+
+
+def serialize_dyeing_records() -> list[dict[str, Any]]:
+    with get_connection() as connection:
+        balance_map = compute_dyeing_balance_map(connection)
+        rows = connection.execute(
+            """
+            SELECT id, date, challan_number, fabric_dyed_meters, remarks, balance_meters, created_at
+            FROM dyeing_records
+            ORDER BY date DESC, id DESC
+            """
+        ).fetchall()
+
+    return [
+        {
+            "id": row["id"],
+            "date": row["date"],
+            "challan_number": row["challan_number"],
+            "fabric_dyed_meters": row["fabric_dyed_meters"],
+            "remarks": row["remarks"],
+            "balance_meters": balance_map.get(row["id"], row["balance_meters"]),
+            "created_at": row["created_at"],
+        }
+        for row in rows
+    ]
 
 
 def add_yarn_purchase(payload: dict[str, Any]) -> dict[str, Any]:

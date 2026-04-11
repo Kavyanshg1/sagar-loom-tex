@@ -70,6 +70,7 @@ const shubhamLedgerColumns = [
   { key: "flow_direction", label: "Flow" },
   { key: "reference_number", label: "Reference" },
   { key: "incoming_kg", label: "Incoming Yarn (kg)" },
+  { key: "consumed_kg", label: "Consumed ex. Wastage (kg)" },
   { key: "outgoing_kg", label: "Outgoing Net Yarn (kg)" },
   { key: "fabric_meters", label: "Fabric (m)" },
   { key: "balance_kg", label: "Balance (kg)" },
@@ -539,6 +540,7 @@ export default function App() {
             flow_direction: "Incoming",
             reference_number: row.invoice_number,
             incoming_kg: row.yarn_weight_kg,
+            consumed_kg: "",
             outgoing_kg: "",
             fabric_meters: "",
             balance_kg: "",
@@ -553,6 +555,7 @@ export default function App() {
           flow_direction: "Outgoing",
           reference_number: row.challan_number,
           incoming_kg: "",
+          consumed_kg: row.yarn_consumed_kg,
           outgoing_kg:
             row.net_consumed_yarn_kg ?? roundToTwo(Number(row.yarn_consumed_kg || 0) + Number(row.wastage_kg || 0)),
           fabric_meters: row.fabric_produced_meters,
@@ -572,6 +575,7 @@ export default function App() {
             flow_direction: "Incoming",
             reference_number: row.invoice_number,
             incoming_kg: row.yarn_weight_kg,
+            consumed_kg: "",
             outgoing_kg: "",
             fabric_meters: "",
             balance_kg: "",
@@ -586,6 +590,7 @@ export default function App() {
           flow_direction: "Outgoing",
           reference_number: row.challan_number,
           incoming_kg: "",
+          consumed_kg: row.yarn_consumed_kg,
           outgoing_kg:
             row.net_consumed_yarn_kg ?? roundToTwo(Number(row.yarn_consumed_kg || 0) + Number(row.wastage_kg || 0)),
           fabric_meters: row.fabric_produced_meters,
@@ -594,34 +599,67 @@ export default function App() {
           search_blob: [row.challan_number].join(" ").toLowerCase(),
         })),
       ],
-      "Sai Leela Processors": [
-        ...(records.processing_records ?? []).map((row) => ({
+      "Sai Leela Processors": (() => {
+        const openingWhiteFabric = Number(records.dashboard.initial_white_fabric_stock_meters || 0);
+        const timeline = [
+          ...(records.processing_records ?? []).map((row) => ({
           rowKey: `sai-in-${row.id}`,
           id: row.id,
           editable: false,
           date: row.date,
+          created_at: row.created_at ?? "",
+          event_priority: 0,
           flow_direction: "Incoming",
           reference_number: row.challan_number,
+          amount_meters: Number(row.fabric_produced_meters || 0),
           incoming_meters: row.fabric_produced_meters,
           outgoing_meters: "",
           balance_meters: "",
           remarks: "From Shubham White Yarn",
           search_blob: [row.challan_number].join(" ").toLowerCase(),
         })),
-        ...(records.dyeing_records ?? []).map((row) => ({
+          ...(records.dyeing_records ?? []).map((row) => ({
           rowKey: `sai-out-${row.id}`,
           id: row.id,
           editable: true,
           date: row.date,
+          created_at: row.created_at ?? "",
+          event_priority: 1,
           flow_direction: "Outgoing",
           reference_number: row.challan_number,
+          amount_meters: Number(row.fabric_dyed_meters || 0),
           incoming_meters: "",
           outgoing_meters: row.fabric_dyed_meters,
-          balance_meters: row.balance_meters,
+          balance_meters: "",
           remarks: row.remarks,
           search_blob: [row.challan_number, row.remarks].join(" ").toLowerCase(),
         })),
-      ],
+        ];
+
+        const sortedTimeline = [...timeline].sort((left, right) => {
+          return (
+            left.date.localeCompare(right.date) ||
+            String(left.created_at).localeCompare(String(right.created_at)) ||
+            left.event_priority - right.event_priority ||
+            left.id - right.id
+          );
+        });
+
+        let runningBalance = roundToTwo(openingWhiteFabric);
+
+        return sortedTimeline.map((row) => {
+          if (row.flow_direction === "Incoming") {
+            runningBalance = roundToTwo(runningBalance + row.amount_meters);
+          } else {
+            runningBalance = roundToTwo(runningBalance - row.amount_meters);
+          }
+
+          return {
+            ...row,
+            balance_meters: runningBalance,
+          };
+        });
+      })(),
       "Sagar Loom Tex Receipts": (records.sagar_receipts ?? []).map((row) => ({
         rowKey: `sagar-${row.id}`,
         id: row.id,

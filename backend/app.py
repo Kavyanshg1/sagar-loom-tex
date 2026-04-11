@@ -51,6 +51,7 @@ from services import (
     set_initial_stock,
     set_initial_stock_by_type,
     set_password,
+    serialize_dyeing_records,
     serialize_rows,
     serialize_user,
     update_dyeing_record,
@@ -277,13 +278,7 @@ def records():
             "direct_processing_records": serialize_rows(
                 "SELECT * FROM direct_processing_records ORDER BY date DESC, id DESC"
             ),
-            "dyeing_records": serialize_rows(
-                """
-                SELECT id, date, challan_number, fabric_dyed_meters, remarks, balance_meters, created_at
-                FROM dyeing_records
-                ORDER BY date DESC, id DESC
-                """
-            ),
+            "dyeing_records": serialize_dyeing_records(),
             "sagar_receipts": serialize_rows(
                 """
                 SELECT id, date, challan_number, fabric_type, meters, source_table, source_record_id, created_at
