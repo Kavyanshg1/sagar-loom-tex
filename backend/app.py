@@ -152,7 +152,22 @@ def format_table_data(columns: list[str], rows: list[dict], keys: list[str]) -> 
     return data
 
 
-def create_report_table(data: list[list[str]], column_widths: list[float]):
+def create_report_table(
+    data: list[list[str]], column_widths: list[float], body_theme: str = "neutral"
+):
+    body_background = colors.white
+    body_text = colors.HexColor("#0f172a")
+    alternating_rows = [colors.white, colors.HexColor("#f8fafc")]
+
+    if body_theme == "incoming":
+        body_background = colors.HexColor("#ecfdf5")
+        body_text = colors.HexColor("#14532d")
+        alternating_rows = [colors.HexColor("#ecfdf5"), colors.HexColor("#dcfce7")]
+    elif body_theme == "outgoing":
+        body_background = colors.HexColor("#111827")
+        body_text = colors.white
+        alternating_rows = [colors.HexColor("#111827"), colors.HexColor("#0f172a")]
+
     table = Table(data, colWidths=column_widths, repeatRows=1)
     table.setStyle(
         TableStyle(
@@ -161,9 +176,10 @@ def create_report_table(data: list[list[str]], column_widths: list[float]):
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("BACKGROUND", (0, 1), (-1, -1), colors.white),
+                ("BACKGROUND", (0, 1), (-1, -1), body_background),
+                ("TEXTCOLOR", (0, 1), (-1, -1), body_text),
                 ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), alternating_rows),
                 ("LEFTPADDING", (0, 0), (-1, -1), 5),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 5),
                 ("TOPPADDING", (0, 0), (-1, -1), 4),
@@ -407,6 +423,7 @@ def export_pdf():
                     ["date", "invoice_number", "yarn_type", "yarn_weight_kg", "notes"],
                 ),
                 [0.75 * inch, 1.0 * inch, 0.75 * inch, 0.85 * inch, 2.1 * inch],
+                "incoming",
             )
         )
         story.append(Spacer(1, 12))
@@ -436,6 +453,7 @@ def export_pdf():
                     ],
                 ),
                 [0.65 * inch, 0.9 * inch, 0.8 * inch, 0.7 * inch, 0.95 * inch, 1.0 * inch],
+                "outgoing",
             )
         )
         story.append(Spacer(1, 12))
@@ -465,6 +483,7 @@ def export_pdf():
                     ],
                 ),
                 [0.65 * inch, 0.9 * inch, 0.8 * inch, 0.7 * inch, 0.95 * inch, 1.0 * inch],
+                "outgoing",
             )
         )
         story.append(Spacer(1, 12))
@@ -480,6 +499,7 @@ def export_pdf():
                     ["date", "challan_number", "fabric_dyed_meters", "remarks", "balance_meters"],
                 ),
                 [0.7 * inch, 0.95 * inch, 0.9 * inch, 1.45 * inch, 0.85 * inch],
+                "outgoing",
             )
         )
         story.append(Spacer(1, 12))
@@ -494,6 +514,7 @@ def export_pdf():
                     ["date", "challan_number", "fabric_type", "meters"],
                 ),
                 [0.95 * inch, 1.45 * inch, 0.95 * inch, 0.95 * inch],
+                "incoming",
             )
         )
 

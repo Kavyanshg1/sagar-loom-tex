@@ -1,5 +1,58 @@
 import { useEffect, useRef, useState } from "react";
 
+function isIncomingRow(row) {
+  return String(row.flow_direction ?? "").toLowerCase().startsWith("incoming");
+}
+
+function getRowToneClasses(row, selected) {
+  if (selected) {
+    return "bg-fuchsia-500/10 ring-1 ring-inset ring-fuchsia-400/40";
+  }
+
+  if (isIncomingRow(row)) {
+    return "bg-emerald-500/10 ring-1 ring-inset ring-emerald-400/15";
+  }
+
+  return "bg-panel";
+}
+
+function getDetailCardToneClasses(row) {
+  return isIncomingRow(row)
+    ? "rounded-2xl border border-emerald-500/15 bg-emerald-500/10 px-3 py-3"
+    : "rounded-2xl bg-night px-3 py-3";
+}
+
+function getDesktopRowToneClasses(row, selected) {
+  if (selected) {
+    return "bg-fuchsia-500/10 ring-1 ring-inset ring-fuchsia-400/40";
+  }
+
+  return isIncomingRow(row)
+    ? "bg-emerald-500/10 hover:bg-emerald-500/15"
+    : "hover:bg-panelSoft";
+}
+
+function renderCellContent(column, row) {
+  const value = column.render ? column.render(row[column.key], row) : row[column.key];
+
+  if (column.key === "flow_direction") {
+    const incoming = isIncomingRow(row);
+    return (
+      <span
+        className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${
+          incoming
+            ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-100"
+            : "border-white/10 bg-night text-slate-200"
+        }`}
+      >
+        {value}
+      </span>
+    );
+  }
+
+  return value;
+}
+
 function ActionsMenu({ isOpen, onToggle, onSelect, onEdit, onDelete, selected, actionsEnabled }) {
   if (!actionsEnabled) {
     return null;
@@ -86,11 +139,10 @@ export function RecordsTable({
           rows.map((row) => (
             <div
               key={row.rowKey ?? row.id}
-              className={`p-4 transition ${
-                selectedRowIds.includes(row.rowKey ?? row.id)
-                  ? "bg-orange-500/10 ring-1 ring-inset ring-orange-400/40"
-                  : "bg-panel"
-              }`}
+              className={`p-4 transition ${getRowToneClasses(
+                row,
+                selectedRowIds.includes(row.rowKey ?? row.id),
+              )}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -102,9 +154,7 @@ export function RecordsTable({
                   {secondaryColumn ? (
                     <div className="mt-1 text-sm text-slate-400">
                       <span className="font-semibold text-slate-300">{secondaryColumn.label}:</span>{" "}
-                      {secondaryColumn.render
-                        ? secondaryColumn.render(row[secondaryColumn.key], row)
-                        : row[secondaryColumn.key]}
+                      {renderCellContent(secondaryColumn, row)}
                     </div>
                   ) : null}
                 </div>
@@ -133,12 +183,15 @@ export function RecordsTable({
               {detailColumns.length > 0 ? (
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {detailColumns.map((column) => (
-                    <div key={`${row.rowKey ?? row.id}-${column.key}`} className="rounded-2xl bg-night px-3 py-3">
+                    <div
+                      key={`${row.rowKey ?? row.id}-${column.key}`}
+                      className={getDetailCardToneClasses(row)}
+                    >
                       <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
                         {column.label}
                       </div>
                       <div className="mt-1 text-sm font-semibold text-slate-200">
-                        {column.render ? column.render(row[column.key], row) : row[column.key]}
+                        {renderCellContent(column, row)}
                       </div>
                     </div>
                   ))}
@@ -182,15 +235,14 @@ export function RecordsTable({
               rows.map((row) => (
                 <tr
                   key={row.rowKey ?? row.id}
-                  className={`transition ${
-                    selectedRowIds.includes(row.rowKey ?? row.id)
-                      ? "bg-orange-500/10 ring-1 ring-inset ring-orange-400/40"
-                      : "hover:bg-panelSoft"
-                  }`}
+                  className={`transition ${getDesktopRowToneClasses(
+                    row,
+                    selectedRowIds.includes(row.rowKey ?? row.id),
+                  )}`}
                 >
                   {columns.map((column) => (
                     <td key={`${row.rowKey ?? row.id}-${column.key}`} className="px-4 py-3 text-slate-200">
-                      {column.render ? column.render(row[column.key], row) : row[column.key]}
+                      {renderCellContent(column, row)}
                     </td>
                   ))}
                   {actionsEnabled ? (
