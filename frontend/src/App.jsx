@@ -271,6 +271,74 @@ function sortRowsByDate(rows, direction) {
   });
 }
 
+function buildShubhamLedgerRows({ purchases, processingRows, openingStock, yarnType }) {
+  const incomingRows = purchases
+    .filter((row) => row.yarn_type === yarnType)
+    .map((row) => ({
+      rowKey: `${yarnType}-in-${row.id}`,
+      id: row.id,
+      editable: false,
+      date: row.date,
+      created_at: row.created_at ?? "",
+      event_priority: 0,
+      flow_direction: "Incoming",
+      reference_number: row.invoice_number,
+      incoming_kg: row.yarn_weight_kg,
+      consumed_kg: "",
+      outgoing_kg: "",
+      fabric_meters: "",
+      balance_kg: "",
+      notes: row.notes,
+      search_blob: [row.invoice_number, row.notes].join(" ").toLowerCase(),
+      balance_delta_kg: Number(row.yarn_weight_kg || 0),
+    }));
+
+  const outgoingRows = processingRows.map((row) => {
+    const consumedKg = Number(row.yarn_consumed_kg || 0);
+    const netConsumedKg =
+      row.net_consumed_yarn_kg ??
+      roundToTwo(Number(row.yarn_consumed_kg || 0) + Number(row.wastage_kg || 0));
+
+    return {
+      rowKey: `${yarnType}-out-${row.id}`,
+      id: row.id,
+      editable: true,
+      date: row.date,
+      created_at: row.created_at ?? "",
+      event_priority: 1,
+      flow_direction: "Outgoing",
+      reference_number: row.challan_number,
+      incoming_kg: "",
+      consumed_kg: consumedKg,
+      outgoing_kg: netConsumedKg,
+      fabric_meters: row.fabric_produced_meters,
+      balance_kg: "",
+      notes: `Wastage ${row.wastage_kg ?? 0} kg`,
+      search_blob: [row.challan_number].join(" ").toLowerCase(),
+      balance_delta_kg: -Number(netConsumedKg || 0),
+    };
+  });
+
+  const timeline = [...incomingRows, ...outgoingRows].sort((left, right) => {
+    return (
+      left.date.localeCompare(right.date) ||
+      String(left.created_at).localeCompare(String(right.created_at)) ||
+      left.event_priority - right.event_priority ||
+      left.id - right.id
+    );
+  });
+
+  let runningBalance = roundToTwo(Number(openingStock || 0));
+
+  return timeline.map((row) => {
+    runningBalance = roundToTwo(runningBalance + Number(row.balance_delta_kg || 0));
+    return {
+      ...row,
+      balance_kg: runningBalance,
+    };
+  });
+}
+
 function getInitialRangeState(defaultValue = "lifetime") {
   return Object.fromEntries(tabs.map((tab) => [tab, defaultValue]));
 }
@@ -515,6 +583,8 @@ export default function App() {
   const tableRows = useMemo(() => {
     const searchTerm = searchState[activeTab].trim().toLowerCase();
     const direction = sortState[activeTab];
+    const whiteOpeningStock = Number(records.dashboard.initial_white_yarn_stock_kg || 0);
+    const blackOpeningStock = Number(records.dashboard.initial_black_yarn_stock_kg || 0);
 
     const ledgerRowsByTab = {
       "Manglam Yarn Purchases": (records.yarn_purchases ?? []).map((row) => ({
@@ -529,76 +599,18 @@ export default function App() {
         notes: row.notes,
         search_blob: [row.invoice_number, row.notes, row.yarn_type].join(" ").toLowerCase(),
       })),
-      "Shubham White Yarn": [
-        ...(records.yarn_purchases ?? [])
-          .filter((row) => row.yarn_type === "white")
-          .map((row) => ({
-            rowKey: `white-in-${row.id}`,
-            id: row.id,
-            editable: false,
-            date: row.date,
-            flow_direction: "Incoming",
-            reference_number: row.invoice_number,
-            incoming_kg: row.yarn_weight_kg,
-            consumed_kg: "",
-            outgoing_kg: "",
-            fabric_meters: "",
-            balance_kg: "",
-            notes: row.notes,
-            search_blob: [row.invoice_number, row.notes].join(" ").toLowerCase(),
-          })),
-        ...(records.processing_records ?? []).map((row) => ({
-          rowKey: `white-out-${row.id}`,
-          id: row.id,
-          editable: true,
-          date: row.date,
-          flow_direction: "Outgoing",
-          reference_number: row.challan_number,
-          incoming_kg: "",
-          consumed_kg: row.yarn_consumed_kg,
-          outgoing_kg:
-            row.net_consumed_yarn_kg ?? roundToTwo(Number(row.yarn_consumed_kg || 0) + Number(row.wastage_kg || 0)),
-          fabric_meters: row.fabric_produced_meters,
-          balance_kg: row.yarn_balance_kg,
-          notes: `Wastage ${row.wastage_kg ?? 0} kg`,
-          search_blob: [row.challan_number].join(" ").toLowerCase(),
-        })),
-      ],
-      "Shubham Black Yarn": [
-        ...(records.yarn_purchases ?? [])
-          .filter((row) => row.yarn_type === "black")
-          .map((row) => ({
-            rowKey: `black-in-${row.id}`,
-            id: row.id,
-            editable: false,
-            date: row.date,
-            flow_direction: "Incoming",
-            reference_number: row.invoice_number,
-            incoming_kg: row.yarn_weight_kg,
-            consumed_kg: "",
-            outgoing_kg: "",
-            fabric_meters: "",
-            balance_kg: "",
-            notes: row.notes,
-            search_blob: [row.invoice_number, row.notes].join(" ").toLowerCase(),
-          })),
-        ...(records.direct_processing_records ?? []).map((row) => ({
-          rowKey: `black-out-${row.id}`,
-          id: row.id,
-          editable: true,
-          date: row.date,
-          flow_direction: "Outgoing",
-          reference_number: row.challan_number,
-          incoming_kg: "",
-          consumed_kg: row.yarn_consumed_kg,
-          outgoing_kg:
-            row.net_consumed_yarn_kg ?? roundToTwo(Number(row.yarn_consumed_kg || 0) + Number(row.wastage_kg || 0)),
-          fabric_meters: row.fabric_produced_meters,
-          balance_kg: row.yarn_balance_kg,
-          notes: `Wastage ${row.wastage_kg ?? 0} kg`,
-          search_blob: [row.challan_number].join(" ").toLowerCase(),
-        })),
-      ],
+      "Shubham White Yarn": buildShubhamLedgerRows({
+        purchases: records.yarn_purchases ?? [],
+        processingRows: records.processing_records ?? [],
+        openingStock: whiteOpeningStock,
+        yarnType: "white",
+      }),
+      "Shubham Black Yarn": buildShubhamLedgerRows({
+        purchases: records.yarn_purchases ?? [],
+        processingRows: records.direct_processing_records ?? [],
+        openingStock: blackOpeningStock,
+        yarnType: "black",
+      }),
       "Sai Leela Processors": (() => {
         const openingWhiteFabric = Number(records.dashboard.initial_white_fabric_stock_meters || 0);
         const timeline = [
