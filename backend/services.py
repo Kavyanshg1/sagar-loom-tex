@@ -629,7 +629,7 @@ def serialize_dyeing_records() -> list[dict[str, Any]]:
             """
             SELECT id, date, challan_number, fabric_dyed_meters, remarks, balance_meters, created_at
             FROM dyeing_records
-            ORDER BY date DESC, id DESC
+            ORDER BY created_at DESC, id DESC
             """
         ).fetchall()
 

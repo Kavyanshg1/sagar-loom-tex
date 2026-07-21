@@ -260,14 +260,21 @@ function matchesSearch(row, searchKeys, searchTerm) {
   return searchKeys.some((key) => String(row[key] ?? "").toLowerCase().includes(searchTerm));
 }
 
-function sortRowsByDate(rows, direction) {
+function getRegistrationTime(row) {
+  const timestamp = new Date(row.created_at || row.date || 0).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function sortRowsByRegistrationTime(rows, direction) {
   return [...rows].sort((left, right) => {
-    const leftDate = new Date(left.date).getTime();
-    const rightDate = new Date(right.date).getTime();
-    if (leftDate === rightDate) {
+    const leftRegisteredAt = getRegistrationTime(left);
+    const rightRegisteredAt = getRegistrationTime(right);
+    if (leftRegisteredAt === rightRegisteredAt) {
       return direction === "asc" ? left.id - right.id : right.id - left.id;
     }
-    return direction === "asc" ? leftDate - rightDate : rightDate - leftDate;
+    return direction === "asc"
+      ? leftRegisteredAt - rightRegisteredAt
+      : rightRegisteredAt - leftRegisteredAt;
   });
 }
 
@@ -592,6 +599,7 @@ export default function App() {
         id: row.id,
         editable: true,
         date: row.date,
+        created_at: row.created_at ?? "",
         flow_direction: "Incoming",
         reference_number: row.invoice_number,
         yarn_type_label: String(row.yarn_type ?? "").toUpperCase(),
@@ -677,6 +685,7 @@ export default function App() {
         id: row.id,
         editable: false,
         date: row.date,
+        created_at: row.created_at ?? "",
         flow_direction: row.fabric_type === "white" ? "Incoming White" : "Incoming Black",
         reference_number: row.challan_number,
         incoming_meters: row.meters,
@@ -685,7 +694,7 @@ export default function App() {
       })),
     };
 
-    return sortRowsByDate(
+    return sortRowsByRegistrationTime(
       (ledgerRowsByTab[activeTab] ?? []).filter(
         (row) =>
           isWithinDateRange(row.date, currentViewRange, currentViewCustomRange) &&
@@ -1598,7 +1607,7 @@ export default function App() {
                     onClick={toggleSortDirection}
                     className="rounded-2xl bg-panelSoft px-4 py-3 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-panel"
                   >
-                    Sort by Date: {sortState[activeTab] === "desc" ? "Newest" : "Oldest"}
+                    Registered: {sortState[activeTab] === "desc" ? "Newest first" : "Oldest first"}
                   </button>
                 </div>
 

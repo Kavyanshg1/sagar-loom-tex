@@ -270,20 +270,20 @@ def records():
     return jsonify(
         {
             "yarn_purchases": serialize_rows(
-                "SELECT * FROM yarn_purchases ORDER BY date DESC, id DESC"
+                "SELECT * FROM yarn_purchases ORDER BY created_at DESC, id DESC"
             ),
             "processing_records": serialize_rows(
-                "SELECT * FROM processing_records ORDER BY date DESC, id DESC"
+                "SELECT * FROM processing_records ORDER BY created_at DESC, id DESC"
             ),
             "direct_processing_records": serialize_rows(
-                "SELECT * FROM direct_processing_records ORDER BY date DESC, id DESC"
+                "SELECT * FROM direct_processing_records ORDER BY created_at DESC, id DESC"
             ),
             "dyeing_records": serialize_dyeing_records(),
             "sagar_receipts": serialize_rows(
                 """
                 SELECT id, date, challan_number, fabric_type, meters, source_table, source_record_id, created_at
                 FROM sagar_receipts
-                ORDER BY date DESC, id DESC
+                ORDER BY created_at DESC, id DESC
                 """
             ),
             "dashboard": get_dashboard(),
@@ -600,7 +600,7 @@ def direct_processing_records():
     return jsonify(
         {
             "records": serialize_rows(
-                "SELECT * FROM direct_processing_records ORDER BY date DESC, id DESC"
+                "SELECT * FROM direct_processing_records ORDER BY created_at DESC, id DESC"
             ),
             "dashboard": get_dashboard(),
         }
