@@ -179,10 +179,16 @@ def extract_text_with_ocr(file_path: Path) -> str:
 def extract_text(file_path: Path) -> str:
     text = ""
     if file_path.suffix.lower() == ".pdf":
-        text = extract_text_from_pdf(file_path)
+        try:
+            text = extract_text_from_pdf(file_path)
+        except Exception as pdf_error:
+            print("PDF TEXT EXTRACTION FAILED:", pdf_error)
 
     if not text or len(text.strip()) < 20:
-        text = extract_text_with_ocr(file_path)
+        try:
+            text = extract_text_with_ocr(file_path)
+        except Exception as ocr_error:
+            print("OCR EXTRACTION FAILED:", ocr_error)
 
     print("EXTRACTED TEXT:", text)
     return text
@@ -510,6 +516,23 @@ def pick_numeric_field(text: str, field: str) -> tuple[float | None, str]:
     candidates = find_numeric_candidates(text)
     if not candidates:
         return None, "low"
+
+    if field in ("yarn_weight_kg", "yarn_consumed_kg"):
+        quantity_candidates = [
+            candidate
+            for candidate in candidates
+            if candidate["has_kg"] or context_has_any(candidate.get("local_context", ""), WEIGHT_CONTEXT)
+        ]
+        if quantity_candidates:
+            candidates = quantity_candidates
+    elif field in ("fabric_produced_meters", "fabric_dyed_meters"):
+        quantity_candidates = [
+            candidate
+            for candidate in candidates
+            if candidate["has_meter"] or context_has_any(candidate.get("local_context", ""), METER_CONTEXT)
+        ]
+        if quantity_candidates:
+            candidates = quantity_candidates
 
     values = [float(candidate["value"]) for candidate in candidates]
     scored = [
