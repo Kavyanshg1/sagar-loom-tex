@@ -7,14 +7,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import cv2
-import numpy as np
-import pdfplumber
-import pytesseract
-from openai import OpenAI
-from pdf2image import convert_from_path
-from PIL import Image
-
 
 FIELD_MAP = {
     "yarn": ("invoice_number", "date", "yarn_weight_kg"),
@@ -38,6 +30,10 @@ NUMERIC_FIELDS = {
 }
 IDENTIFIER_FIELDS = {"invoice_number", "challan_number"}
 CONFIDENCE_ORDER = {"low": 0, "medium": 1, "high": 2}
+MONTH_PATTERN = (
+    r"jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+    r"jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?"
+)
 DATE_FORMATS = (
     "%Y-%m-%d",
     "%d-%m-%Y",
@@ -52,6 +48,31 @@ DATE_FORMATS = (
     "%b %d %Y",
     "%B %d %Y",
 )
+NEGATIVE_NUMBER_CONTEXT = (
+    "amount",
+    "rate",
+    "rs",
+    "rupee",
+    "invoice value",
+    "tax",
+    "gst",
+    "cgst",
+    "sgst",
+    "igst",
+    "lr",
+    "l.r",
+    "lorry",
+    "transport",
+    "freight",
+    "vehicle",
+    "eway",
+    "e-way",
+    "phone",
+    "mobile",
+)
+TOTAL_CONTEXT = ("total", "net", "gross", "grand", "summary", "final", "balance")
+WEIGHT_CONTEXT = ("kg", "kgs", "kilogram", "weight", "qty", "quantity", "wt")
+METER_CONTEXT = ("meter", "meters", "mtr", "mtrs", "metre", "metres", "fabric")
 
 
 def empty_detected_fields(document_type: str) -> dict[str, Any]:
@@ -69,6 +90,9 @@ def downgrade_confidence(current: str, next_level: str) -> str:
 
 
 def render_document_images(file_path: Path) -> list[Image.Image]:
+    from pdf2image import convert_from_path
+    from PIL import Image
+
     suffix = file_path.suffix.lower()
     if suffix == ".pdf":
         return [image.convert("RGB") for image in convert_from_path(file_path, dpi=300)]
@@ -78,6 +102,8 @@ def render_document_images(file_path: Path) -> list[Image.Image]:
 
 
 def deskew_image(gray_image: np.ndarray) -> np.ndarray:
+    import cv2
+
     inverted = cv2.bitwise_not(gray_image)
     coordinates = cv2.findNonZero(inverted)
     if coordinates is None:
@@ -105,6 +131,10 @@ def deskew_image(gray_image: np.ndarray) -> np.ndarray:
 
 
 def preprocess_image(image: Image.Image) -> Image.Image:
+    import cv2
+    import numpy as np
+    from PIL import Image
+
     rgb_image = np.array(image.convert("RGB"))
     gray_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY)
     gray_image = cv2.fastNlMeansDenoising(gray_image, None, 12, 7, 21)
@@ -121,6 +151,8 @@ def preprocess_image(image: Image.Image) -> Image.Image:
 
 
 def extract_text_from_pdf(file_path: Path) -> str:
+    import pdfplumber
+
     text_parts: list[str] = []
     with pdfplumber.open(file_path) as pdf:
         for page in pdf.pages:
@@ -132,6 +164,8 @@ def extract_text_from_pdf(file_path: Path) -> str:
 
 
 def extract_text_with_ocr(file_path: Path) -> str:
+    import pytesseract
+
     extracted_pages: list[str] = []
     for index, image in enumerate(render_document_images(file_path), start=1):
         processed_image = preprocess_image(image)
@@ -184,6 +218,8 @@ def extract_fields_with_ai(document_type: str, ocr_text: str) -> dict[str, Any]:
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured.")
 
+    from openai import OpenAI
+
     client = OpenAI(api_key=api_key)
     response = client.chat.completions.create(
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
@@ -229,6 +265,309 @@ def extract_fields_with_ai(document_type: str, ocr_text: str) -> dict[str, Any]:
     if "detected_fields" in parsed:
         return parsed
     return {"detected_fields": parsed}
+
+
+def compact_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
+def context_has_any(context: str, words: tuple[str, ...]) -> bool:
+    for word in words:
+        if " " in word or "-" in word:
+            if word in context:
+                return True
+            continue
+        if re.search(rf"\b{re.escape(word)}\b", context):
+            return True
+    return False
+
+
+def clean_labelled_identifier(value: str) -> str:
+    value = re.split(r"(?i)\b(date|dt|dated)\b", value, maxsplit=1)[0]
+    value = re.sub(
+        r"(?i)\b(invoice|bill|challan|chalan|chl|no|number)\b",
+        " ",
+        value,
+    )
+    value = re.sub(r"[^A-Za-z0-9/-]+", " ", value)
+    return re.sub(r"\s+", " ", value).strip(" :-/")
+
+
+def text_lines(text: str) -> list[str]:
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
+def find_date_candidates(text: str) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    patterns = (
+        r"\b\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\b",
+        r"\b\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b",
+        rf"\b\d{{1,2}}\s+(?:{MONTH_PATTERN})\s+\d{{2,4}}\b",
+        rf"\b(?:{MONTH_PATTERN})\s+\d{{1,2}},?\s+\d{{2,4}}\b",
+    )
+    for line_index, line in enumerate(text_lines(text)):
+        lowered = line.lower()
+        for pattern in patterns:
+            for match in re.finditer(pattern, line, flags=re.IGNORECASE):
+                normalized = normalize_date(match.group(0))
+                if not normalized:
+                    continue
+                score = 20
+                if "date" in lowered or "dated" in lowered or "dt" in lowered:
+                    score += 16
+                if "invoice" in lowered or "challan" in lowered or "bill" in lowered:
+                    score += 6
+                if "due" in lowered or "valid" in lowered or "eway" in lowered or "e-way" in lowered:
+                    score -= 8
+                candidates.append(
+                    {
+                        "value": normalized,
+                        "score": score,
+                        "line_index": line_index,
+                        "raw": match.group(0),
+                    }
+                )
+    return candidates
+
+
+def find_identifier_candidates(text: str, labels: tuple[str, ...]) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    joined_labels = "|".join(labels)
+    line_list = text_lines(text)
+    for line_index, line in enumerate(line_list):
+        lowered = line.lower()
+        if not any(label in lowered for label in labels):
+            continue
+
+        label_match = re.search(
+            rf"(?i)\b(?:{joined_labels})\b\s*(?:no|number|#)?\.?\s*[:\-/]?\s*([A-Za-z0-9][A-Za-z0-9/\- ]{{0,24}})",
+            line,
+        )
+        raw_value = label_match.group(1) if label_match else line
+        value = clean_labelled_identifier(raw_value)
+        if not value:
+            continue
+
+        tokens = [token for token in re.split(r"\s+", value) if re.search(r"[A-Za-z0-9]", token)]
+        if tokens:
+            value = tokens[0]
+
+        score = 18
+        if ":" in line or "no" in lowered or "number" in lowered:
+            score += 8
+        if len(value) <= 3 and value.isalpha():
+            score -= 8
+        if re.search(r"\d", value):
+            score += 6
+        candidates.append({"value": value, "score": score, "line_index": line_index, "raw": line})
+
+    return candidates
+
+
+def number_context(line_list: list[str], line_index: int, start: int, end: int) -> str:
+    before_line = line_list[line_index - 1] if line_index > 0 else ""
+    current_line = line_list[line_index]
+    after_line = line_list[line_index + 1] if line_index + 1 < len(line_list) else ""
+    local = current_line[max(0, start - 55) : min(len(current_line), end + 55)]
+    return compact_text(" ".join([before_line, local, after_line])).lower()
+
+
+def find_numeric_candidates(text: str) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    line_list = text_lines(text)
+    number_pattern = r"(?<![A-Za-z0-9])(\d{1,3}(?:,\d{2,3})*(?:\.\d+)?|\d+(?:\.\d+)?)(?![A-Za-z0-9])"
+    date_patterns = (
+        r"\b\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\b",
+        r"\b\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b",
+    )
+
+    for line_index, line in enumerate(line_list):
+        date_spans = [
+            date_match.span()
+            for pattern in date_patterns
+            for date_match in re.finditer(pattern, line)
+        ]
+        for match in re.finditer(number_pattern, line):
+            if any(match.start() >= start and match.end() <= end for start, end in date_spans):
+                continue
+            value = normalize_number(match.group(1))
+            if value is None or value <= 0:
+                continue
+            local_context = compact_text(
+                line[max(0, match.start() - 55) : min(len(line), match.end() + 55)]
+            ).lower()
+            context = number_context(line_list, line_index, match.start(), match.end())
+            candidates.append(
+                {
+                    "value": value,
+                    "context": context,
+                    "local_context": local_context,
+                    "line": line,
+                    "line_index": line_index,
+                    "position": match.start(),
+                    "has_kg": bool(re.search(r"\b(kgs?|kilograms?)\b", local_context)),
+                    "has_meter": bool(re.search(r"\b(m|mtrs?|meters?|metres?)\b", local_context)),
+                }
+            )
+    return candidates
+
+
+def score_numeric_candidate(candidate: dict[str, Any], field: str, all_values: list[float]) -> float:
+    context = candidate["context"]
+    local_context = candidate.get("local_context", context)
+    value = float(candidate["value"])
+    score = 0.0
+    is_weight_field = field in ("yarn_weight_kg", "yarn_consumed_kg")
+    has_local_weight_context = candidate["has_kg"] or any(word in local_context for word in WEIGHT_CONTEXT)
+    has_local_meter_context = candidate["has_meter"] or any(word in local_context for word in METER_CONTEXT)
+    has_weight_context = has_local_weight_context or context_has_any(context, WEIGHT_CONTEXT)
+    has_meter_context = has_local_meter_context or context_has_any(context, METER_CONTEXT)
+    money_words = (
+            "rs",
+            "rupee",
+            "amount",
+            "net amount",
+            "taxable",
+            "invoice value",
+            "grand total",
+            "gst",
+            "cgst",
+            "sgst",
+            "igst",
+            "round off",
+            "payable",
+    )
+    has_money_context = context_has_any(context, money_words)
+    has_local_money_context = context_has_any(local_context, money_words)
+
+    if context_has_any(context, NEGATIVE_NUMBER_CONTEXT):
+        score -= 35
+    if context_has_any(context, TOTAL_CONTEXT):
+        score += 18
+    if "final" in context or "grand total" in context:
+        score += 12
+
+    if is_weight_field:
+        if has_weight_context:
+            score += 30
+        else:
+            score -= 28
+        if has_meter_context:
+            score -= 18
+        if has_local_money_context and not has_local_weight_context:
+            score -= 90
+        if field == "yarn_weight_kg" and context_has_any(context, TOTAL_CONTEXT):
+            score += 12
+        if field == "yarn_consumed_kg" and context_has_any(
+            context,
+            ("consume", "consumed", "issue", "issued", "used", "yarn"),
+        ):
+            score += 14
+    else:
+        if has_meter_context:
+            score += 30
+        else:
+            score -= 28
+        if candidate["has_kg"]:
+            score -= 18
+        if has_money_context and not has_meter_context:
+            score -= 90
+        if field == "fabric_produced_meters" and context_has_any(
+            context,
+            ("produce", "produced", "grey", "fabric", "meter", "mtr"),
+        ):
+            score += 14
+        if field == "fabric_dyed_meters" and context_has_any(
+            context,
+            ("dyed", "dyeing", "process", "processed", "finish", "fabric"),
+        ):
+            score += 14
+
+    if all_values:
+        largest = max(all_values)
+        if (
+            field == "yarn_weight_kg"
+            and has_local_weight_context
+            and abs(value - largest) <= max(1, largest * 0.02)
+        ):
+            score += 16
+
+    if value < 1:
+        score -= 20
+    elif value < 10:
+        score -= 8
+
+    # Textile quantity fields are normally bigger than invoice numbers, rates, and GST percentages.
+    if value >= 50:
+        score += 7
+    if value >= 100:
+        score += 5
+
+    return score
+
+
+def pick_numeric_field(text: str, field: str) -> tuple[float | None, str]:
+    candidates = find_numeric_candidates(text)
+    if not candidates:
+        return None, "low"
+
+    values = [float(candidate["value"]) for candidate in candidates]
+    scored = [
+        (score_numeric_candidate(candidate, field, values), candidate)
+        for candidate in candidates
+    ]
+    scored.sort(key=lambda item: (item[0], item[1]["value"]), reverse=True)
+    best_score, best_candidate = scored[0]
+
+    if best_score >= 45:
+        confidence = "high"
+    elif best_score >= 25:
+        confidence = "medium"
+    else:
+        confidence = "low"
+
+    return round(float(best_candidate["value"]), 2), confidence
+
+
+def extract_fields_locally(document_type: str, text: str) -> tuple[dict[str, Any], dict[str, str]]:
+    fields = empty_detected_fields(document_type)
+    confidence = empty_confidence(document_type)
+
+    date_candidates = find_date_candidates(text)
+    if date_candidates and "date" in fields:
+        best_date = max(date_candidates, key=lambda candidate: candidate["score"])
+        fields["date"] = best_date["value"]
+        confidence["date"] = "high" if best_date["score"] >= 32 else "medium"
+
+    if "invoice_number" in fields:
+        invoice_candidates = find_identifier_candidates(
+            text,
+            ("invoice", "inv", "bill", "tax invoice", "bill no", "bill number"),
+        )
+        if invoice_candidates:
+            best_invoice = max(invoice_candidates, key=lambda candidate: candidate["score"])
+            fields["invoice_number"] = best_invoice["value"]
+            confidence["invoice_number"] = "high" if best_invoice["score"] >= 28 else "medium"
+
+    if "challan_number" in fields:
+        challan_candidates = find_identifier_candidates(
+            text,
+            ("challan", "chalan", "chl", "delivery challan", "dc", "d/c"),
+        )
+        if challan_candidates:
+            best_challan = max(challan_candidates, key=lambda candidate: candidate["score"])
+            fields["challan_number"] = best_challan["value"]
+            confidence["challan_number"] = "high" if best_challan["score"] >= 28 else "medium"
+
+    for field in fields:
+        if field not in NUMERIC_FIELDS:
+            continue
+        numeric_value, numeric_confidence = pick_numeric_field(text, field)
+        if numeric_value is not None:
+            fields[field] = int(numeric_value) if float(numeric_value).is_integer() else numeric_value
+            confidence[field] = numeric_confidence
+
+    return fields, confidence
 
 
 def normalize_date(raw_value: Any) -> str:
@@ -422,32 +761,33 @@ def process_document_upload(file_path: Path, document_type: str) -> dict[str, An
             "message": "Review detected values before saving.",
         }
 
-    try:
-        ai_payload = extract_fields_with_ai(document_type, raw_text)
-        normalized_fields, confidence = normalize_ai_output(document_type, ai_payload, raw_text)
+    local_fields, local_confidence = extract_fields_locally(document_type, raw_text)
 
-        return {
-            "detected_fields": normalized_fields,
-            "confidence": confidence,
-            "ocr_text": raw_text,
-            "message": "Review detected values before saving.",
-        }
-    except Exception:
-        regex_fields = extract_with_regex(raw_text)
-        fallback_fields = empty_detected_fields(document_type)
-        fallback_fields.update(
-            {
-                key: value
-                for key, value in regex_fields.items()
-                if key in fallback_fields
-            }
-        )
-        return {
-            "detected_fields": fallback_fields,
-            "confidence": {
-                field: ("medium" if fallback_fields.get(field) not in ("", None) else "low")
-                for field in fallback_fields
-            },
-            "ocr_text": raw_text,
-            "message": "Review detected values before saving.",
-        }
+    if os.getenv("USE_OPENAI_EXTRACTION", "").strip().lower() in {"1", "true", "yes"}:
+        try:
+            ai_payload = extract_fields_with_ai(document_type, raw_text)
+            ai_fields, ai_confidence = normalize_ai_output(document_type, ai_payload, raw_text)
+            for field in FIELD_MAP[document_type]:
+                if ai_fields.get(field) not in ("", None) and (
+                    local_fields.get(field) in ("", None)
+                    or CONFIDENCE_ORDER.get(ai_confidence.get(field, "low"), 0)
+                    > CONFIDENCE_ORDER.get(local_confidence.get(field, "low"), 0)
+                ):
+                    local_fields[field] = ai_fields[field]
+                    local_confidence[field] = ai_confidence.get(field, "medium")
+        except Exception as extraction_error:
+            print("OPTIONAL AI EXTRACTION FAILED:", extraction_error)
+
+    regex_fields = extract_with_regex(raw_text)
+    for field, value in regex_fields.items():
+        if field in local_fields and local_fields.get(field) in ("", None):
+            normalized_value = normalize_number(value) if field in NUMERIC_FIELDS else value
+            local_fields[field] = normalized_value if normalized_value is not None else value
+            local_confidence[field] = "medium"
+
+    return {
+        "detected_fields": local_fields,
+        "confidence": local_confidence,
+        "ocr_text": raw_text,
+        "message": "Review detected values before saving.",
+    }
