@@ -260,21 +260,19 @@ function matchesSearch(row, searchKeys, searchTerm) {
   return searchKeys.some((key) => String(row[key] ?? "").toLowerCase().includes(searchTerm));
 }
 
-function getRegistrationTime(row) {
-  const timestamp = new Date(row.created_at || row.date || 0).getTime();
-  return Number.isNaN(timestamp) ? 0 : timestamp;
-}
-
-function sortRowsByRegistrationTime(rows, direction) {
+function sortRowsByDate(rows, direction) {
   return [...rows].sort((left, right) => {
-    const leftRegisteredAt = getRegistrationTime(left);
-    const rightRegisteredAt = getRegistrationTime(right);
-    if (leftRegisteredAt === rightRegisteredAt) {
-      return direction === "asc" ? left.id - right.id : right.id - left.id;
+    const dateComparison = String(left.date ?? "").localeCompare(String(right.date ?? ""));
+    if (dateComparison !== 0) {
+      return direction === "asc" ? dateComparison : -dateComparison;
     }
-    return direction === "asc"
-      ? leftRegisteredAt - rightRegisteredAt
-      : rightRegisteredAt - leftRegisteredAt;
+
+    const registrationComparison = String(left.created_at ?? "").localeCompare(String(right.created_at ?? ""));
+    if (registrationComparison !== 0) {
+      return direction === "asc" ? registrationComparison : -registrationComparison;
+    }
+
+    return direction === "asc" ? left.id - right.id : right.id - left.id;
   });
 }
 
@@ -694,7 +692,7 @@ export default function App() {
       })),
     };
 
-    return sortRowsByRegistrationTime(
+    return sortRowsByDate(
       (ledgerRowsByTab[activeTab] ?? []).filter(
         (row) =>
           isWithinDateRange(row.date, currentViewRange, currentViewCustomRange) &&
@@ -1607,7 +1605,7 @@ export default function App() {
                     onClick={toggleSortDirection}
                     className="rounded-2xl bg-panelSoft px-4 py-3 text-sm font-semibold text-slate-100 shadow-sm transition hover:bg-panel"
                   >
-                    Registered: {sortState[activeTab] === "desc" ? "Newest first" : "Oldest first"}
+                    Date: {sortState[activeTab] === "desc" ? "Newest first" : "Oldest first"}
                   </button>
                 </div>
 
