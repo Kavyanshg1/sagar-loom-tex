@@ -280,6 +280,7 @@ function buildShubhamLedgerRows({ purchases, processingRows, openingStock, yarnT
   const incomingRows = purchases
     .filter((row) => row.yarn_type === yarnType)
     .map((row) => ({
+      ...row,
       rowKey: `${yarnType}-in-${row.id}`,
       id: row.id,
       editable: false,
@@ -305,6 +306,9 @@ function buildShubhamLedgerRows({ purchases, processingRows, openingStock, yarnT
       roundToTwo(Number(row.yarn_consumed_kg || 0) + Number(row.wastage_kg || 0));
 
     return {
+      // Keep the source record fields on the ledger row. The row is also used
+      // to open the edit form, which needs the API field names and values.
+      ...row,
       rowKey: `${yarnType}-out-${row.id}`,
       id: row.id,
       editable: true,
@@ -593,6 +597,7 @@ export default function App() {
 
     const ledgerRowsByTab = {
       "Manglam Yarn Purchases": (records.yarn_purchases ?? []).map((row) => ({
+        ...row,
         rowKey: `yarn-${row.id}`,
         id: row.id,
         editable: true,
@@ -621,6 +626,7 @@ export default function App() {
         const openingWhiteFabric = Number(records.dashboard.initial_white_fabric_stock_meters || 0);
         const timeline = [
           ...(records.processing_records ?? []).map((row) => ({
+          ...row,
           rowKey: `sai-in-${row.id}`,
           id: row.id,
           editable: false,
@@ -637,6 +643,7 @@ export default function App() {
           search_blob: [row.challan_number].join(" ").toLowerCase(),
         })),
           ...(records.dyeing_records ?? []).map((row) => ({
+          ...row,
           rowKey: `sai-out-${row.id}`,
           id: row.id,
           editable: true,
