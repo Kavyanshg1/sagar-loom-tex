@@ -831,14 +831,10 @@ def update_processing_like_record(
         if projected_draw > total_purchased + opening_stock:
             raise ValueError("Updated processing record exceeds available yarn balance.")
 
-        if table_name == "processing_records":
-            total_processing = fetch_total_processing_fabric(connection)
-            total_dyed = fetch_total_fabric_dyed(connection)
-            projected_processing = round(
-                total_processing - float(existing["fabric_produced_meters"]) + fabric_produced, 2
-            )
-            if projected_processing < total_dyed:
-                raise ValueError("Updated processing record would reduce fabric below dyed output.")
+        # A production correction must be allowed even if Sai Leela has
+        # already dyed more fabric than the corrected production total.
+        # Dyeing balances are recomputed below and may go negative, making
+        # the shortfall visible instead of blocking the source correction.
 
         connection.execute(
             f"""
