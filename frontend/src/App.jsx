@@ -15,6 +15,7 @@ const tabs = [
   "Shubham White Yarn",
   "Shubham Black Yarn",
   "Sai Leela Processors",
+  "Raymons Finishing Mills",
   "Sagar Loom Tex Receipts",
 ];
 
@@ -39,6 +40,20 @@ const processingFields = [
   },
   { name: "fabric_produced_meters", label: "Fabric Produced (m)", type: "number" },
   { name: "yarn_balance_kg", label: "Yarn Balance (kg)", type: "number", readOnly: true },
+];
+
+const whiteProcessingFields = [
+  ...processingFields.slice(0, 2),
+  {
+    name: "destination",
+    label: "White Fabric Goes To",
+    type: "select",
+    options: [
+      { value: "sai_leela", label: "Sai Leela" },
+      { value: "raymons", label: "Raymons Finishing Mills" },
+    ],
+  },
+  ...processingFields.slice(2),
 ];
 
 const processingColumns = [
@@ -75,6 +90,12 @@ const shubhamLedgerColumns = [
   { key: "fabric_meters", label: "Fabric (m)" },
   { key: "balance_kg", label: "Balance (kg)" },
   { key: "notes", label: "Notes" },
+];
+
+const whiteShubhamLedgerColumns = [
+  ...shubhamLedgerColumns.slice(0, 3),
+  { key: "destination_label", label: "Fabric Sent To" },
+  ...shubhamLedgerColumns.slice(3),
 ];
 
 const saiLedgerColumns = [
@@ -131,9 +152,9 @@ const config = {
     documentType: "processing",
     uploadTitle: "White Processing Challan Preview",
     searchKey: "challan_number",
-    summaryLabel: "White fabric sent to Sai",
-    fields: processingFields,
-    tableColumns: shubhamLedgerColumns,
+    summaryLabel: "White fabric produced",
+    fields: whiteProcessingFields,
+    tableColumns: whiteShubhamLedgerColumns,
     emptyMessage: "No white processing records yet.",
   },
   "Sai Leela Processors": {
@@ -173,8 +194,24 @@ const config = {
     searchKey: "challan_number",
     summaryLabel: "Incoming fabric",
     readOnly: true,
+    readOnlyDescription: "Sagar receipts are created automatically from the upstream challans, so this screen stays read-only and easy to audit.",
     tableColumns: sagarLedgerColumns,
     emptyMessage: "No incoming Sagar fabric records yet.",
+  },
+  "Raymons Finishing Mills": {
+    title: "Raymons Finishing Mills - White Fabric",
+    recordsKey: "processing_records",
+    searchKey: "challan_number",
+    summaryLabel: "White fabric received",
+    readOnly: true,
+    readOnlyDescription: "White fabric routed to Raymons from Shubham White Yarn appears here automatically.",
+    tableColumns: [
+      { key: "date", label: "Date" },
+      { key: "flow_direction", label: "Flow" },
+      { key: "reference_number", label: "Challan #" },
+      { key: "incoming_meters", label: "Incoming White Fabric (m)" },
+    ],
+    emptyMessage: "No white fabric has been routed to Raymons yet.",
   },
 };
 
@@ -206,6 +243,7 @@ function createDefaultValues() {
     "Shubham White Yarn": {
       date: today,
       challan_number: "",
+      destination: "sai_leela",
       yarn_consumed_kg: "",
       wastage_kg: "",
       net_consumed_yarn_kg: "",
@@ -323,6 +361,8 @@ function buildShubhamLedgerRows({ purchases, processingRows, openingStock, yarnT
       fabric_meters: row.fabric_produced_meters,
       balance_kg: "",
       notes: `Wastage ${row.wastage_kg ?? 0} kg`,
+      destination_label:
+        row.destination === "raymons" ? "Raymons Finishing Mills" : "Sai Leela",
       search_blob: [row.challan_number].join(" ").toLowerCase(),
       balance_delta_kg: -Number(netConsumedKg || 0),
     };
@@ -625,7 +665,7 @@ export default function App() {
       "Sai Leela Processors": (() => {
         const openingWhiteFabric = Number(records.dashboard.initial_white_fabric_stock_meters || 0);
         const timeline = [
-          ...(records.processing_records ?? []).map((row) => ({
+          ...(records.processing_records ?? []).filter((row) => row.destination !== "raymons").map((row) => ({
           ...row,
           rowKey: `sai-in-${row.id}`,
           id: row.id,
@@ -697,6 +737,19 @@ export default function App() {
         notes: row.fabric_type === "white" ? "From Sai Leela" : "Direct from Shubham",
         search_blob: [row.challan_number, row.fabric_type].join(" ").toLowerCase(),
       })),
+      "Raymons Finishing Mills": (records.processing_records ?? [])
+        .filter((row) => row.destination === "raymons")
+        .map((row) => ({
+          ...row,
+          rowKey: `raymons-${row.id}`,
+          editable: false,
+          date: row.date,
+          created_at: row.created_at ?? "",
+          flow_direction: "Incoming",
+          reference_number: row.challan_number,
+          incoming_meters: row.fabric_produced_meters,
+          search_blob: [row.challan_number].join(" ").toLowerCase(),
+        })),
     };
 
     return sortRowsByDate(
@@ -1263,13 +1316,15 @@ export default function App() {
     "Manglam Yarn Purchases":
       "Record black and white yarn separately so each downstream branch has a clean incoming yarn history.",
     "Shubham White Yarn":
-      "Track white-yarn incoming purchases separately from outgoing white-fabric challans sent onward to Sai Leela.",
+      "Track white-yarn production and choose whether each fabric challan goes to Sai Leela or Raymons Finishing Mills.",
     "Shubham Black Yarn":
       "Track black-yarn incoming purchases separately from outgoing black-fabric challans sent directly to Sagar Loom Tex.",
     "Sai Leela Processors":
       "Track incoming white fabric from Shubham separately from outgoing dyed fabric sent onward, with remarks in shade-number format.",
     "Sagar Loom Tex Receipts":
       "Sagar now shows separate incoming white and incoming black receipt tables so both branches remain independently auditable.",
+    "Raymons Finishing Mills":
+      "White fabric entries routed to Raymons from Shubham appear here automatically.",
   };
 
   const flowSummary = records.dashboard.flow_summary;
@@ -1308,6 +1363,7 @@ export default function App() {
       `White yarn balance: ${formatMetric(flowSummary.shubham_white.yarn_balance_kg, "kg")}`,
       `White fabric produced: ${formatMetric(flowSummary.shubham_white.fabric_produced_meters, "m")}`,
       `Sent to Sai Leela: ${formatMetric(flowSummary.shubham_white.fabric_sent_to_sai_meters, "m")}`,
+      `Sent to Raymons: ${formatMetric(flowSummary.shubham_white.fabric_sent_to_raymons_meters, "m")}`,
     ],
     shubhamBlack: [
       `Black yarn balance: ${formatMetric(flowSummary.shubham_black.yarn_balance_kg, "kg")}`,
@@ -1410,9 +1466,9 @@ export default function App() {
               <div className="rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur sm:rounded-[28px] sm:p-5">
                 <div className="text-sm font-semibold text-slate-200">Live production note</div>
                 <div className="mt-3 text-sm leading-6 text-slate-300">
-                  The app is now split into two cleaner branches: white yarn flows through Sai
-                  Leela before reaching Sagar, while black yarn moves from Shubham directly to
-                  Sagar with its own stock ledger.
+                  White fabric from Shubham can now be routed to Sai Leela or Raymons Finishing
+                  Mills. Sai Leela and Raymons each show their own incoming white-fabric records;
+                  black fabric continues directly to Sagar.
                 </div>
               </div>
             </div>
@@ -1425,11 +1481,11 @@ export default function App() {
           </div>
         ) : null}
 
-        <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <StatCard
             label="Shubham White Yarn"
             value={formatMetric(records.dashboard.white_yarn_with_shubham_kg, "kg")}
-            subtitle="Live white-yarn stock available for the Sai Leela branch."
+            subtitle="Live white-yarn stock available for both white-fabric routes."
             accent="bg-fuchsia-500/20 text-fuchsia-100"
           />
           <StatCard
@@ -1443,6 +1499,12 @@ export default function App() {
             value={formatMetric(records.dashboard.white_fabric_with_sai_meters, "m")}
             subtitle="White fabric currently available at Sai Leela after dyeing."
             accent="bg-cyan-500/20 text-cyan-100"
+          />
+          <StatCard
+            label="Raymons White Fabric"
+            value={formatMetric(records.dashboard.white_fabric_with_raymons_meters, "m")}
+            subtitle="White fabric routed from Shubham to Raymons Finishing Mills."
+            accent="bg-amber-500/20 text-amber-100"
           />
           <StatCard
             label="Fabric With Sagar"
@@ -1577,11 +1639,13 @@ export default function App() {
                   {activeTab === "Manglam Yarn Purchases"
                     ? `${formatMetric(flowSummary.manglam.white_yarn_purchased_kg, "kg")} white / ${formatMetric(flowSummary.manglam.black_yarn_purchased_kg, "kg")} black`
                     : activeTab === "Shubham White Yarn"
-                      ? formatMetric(flowSummary.shubham_white.fabric_sent_to_sai_meters, "m")
+                      ? formatMetric(flowSummary.shubham_white.fabric_produced_meters, "m")
                       : activeTab === "Shubham Black Yarn"
                         ? formatMetric(flowSummary.shubham_black.fabric_sent_to_sagar_meters, "m")
                         : activeTab === "Sai Leela Processors"
                           ? formatMetric(flowSummary.sai.balance_meters, "m")
+                          : activeTab === "Raymons Finishing Mills"
+                            ? formatMetric(flowSummary.raymons.white_fabric_received_meters, "m")
                           : formatMetric(flowSummary.sagar.total_fabric_received_meters, "m")}
                 </span>
               </div>
@@ -1725,7 +1789,7 @@ export default function App() {
               </h3>
               <p className="mt-2 text-sm text-slate-400">
                 {isReadOnlyTab
-                  ? "Sagar receipts are created automatically from the upstream challans, so this screen stays read-only and easy to audit."
+                  ? currentConfig.readOnlyDescription
                   : "Manual entry stays fully available. Uploads only help prefill fields before you review and save."}
               </p>
             </div>

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS processing_records (
     yarn_consumed_kg REAL NOT NULL,
     wastage_kg REAL NOT NULL,
     fabric_produced_meters REAL NOT NULL,
+    destination TEXT NOT NULL DEFAULT 'sai_leela',
     yarn_balance_kg REAL NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

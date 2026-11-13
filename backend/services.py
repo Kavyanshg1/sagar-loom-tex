@@ -11,6 +11,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 WASTAGE_RATE = 0.04
 PROCESSING_TABLES = ("processing_records", "direct_processing_records")
+SAI_LEELA_DESTINATION = "sai_leela"
+RAYMONS_DESTINATION = "raymons"
 PASSWORD_KEY = "password_hash"
 INITIAL_WHITE_YARN_KEY = "initial_white_yarn"
 INITIAL_BLACK_YARN_KEY = "initial_black_yarn"
@@ -83,7 +85,11 @@ def get_filtered_records(
             yarn_consumed_kg,
             wastage_kg,
             (yarn_consumed_kg + wastage_kg) AS net_consumed_yarn_kg,
-            fabric_produced_meters
+            fabric_produced_meters,
+            CASE destination
+                WHEN 'raymons' THEN 'Raymons Finishing Mills'
+                ELSE 'Sai Leela'
+            END AS destination_label
         FROM processing_records{where_clause}
         ORDER BY date ASC, id ASC
         """,
@@ -367,10 +373,17 @@ def fetch_total_yarn_draw(connection, yarn_type: str | None = None) -> float:
     return round(float(row[0] or 0), 2)
 
 
-def fetch_total_processing_fabric(connection, table_name: str = "processing_records") -> float:
-    row = connection.execute(
-        f"SELECT COALESCE(SUM(fabric_produced_meters), 0) FROM {table_name}"
-    ).fetchone()
+def fetch_total_processing_fabric(
+    connection, table_name: str = "processing_records", destination: str | None = None
+) -> float:
+    if table_name not in PROCESSING_TABLES:
+        raise ValueError("Unsupported processing table.")
+    query = f"SELECT COALESCE(SUM(fabric_produced_meters), 0) FROM {table_name}"
+    params: tuple[Any, ...] = ()
+    if table_name == "processing_records" and destination:
+        query += " WHERE destination = ?"
+        params = (destination,)
+    row = connection.execute(query, params).fetchone()
     return round(float(row[0] or 0), 2)
 
 
@@ -397,7 +410,17 @@ def calculate_yarn_purchased_by_type(yarn_type: str) -> float:
 
 
 def calculate_processing_fabric_sent_to_sai() -> float:
-    return fetch_scalar("SELECT COALESCE(SUM(fabric_produced_meters), 0) FROM processing_records")
+    return fetch_scalar(
+        "SELECT COALESCE(SUM(fabric_produced_meters), 0) FROM processing_records WHERE destination = ?",
+        (SAI_LEELA_DESTINATION,),
+    )
+
+
+def calculate_processing_fabric_sent_to_raymons() -> float:
+    return fetch_scalar(
+        "SELECT COALESCE(SUM(fabric_produced_meters), 0) FROM processing_records WHERE destination = ?",
+        (RAYMONS_DESTINATION,),
+    )
 
 
 def calculate_direct_fabric_sent_to_sagar() -> float:
@@ -426,7 +449,10 @@ def sync_sagar_receipts(connection) -> None:
 
 def calculate_total_shubham_fabric_produced() -> float:
     return round(
-        calculate_processing_fabric_sent_to_sai() + calculate_direct_fabric_sent_to_sagar(), 2
+        calculate_processing_fabric_sent_to_sai()
+        + calculate_processing_fabric_sent_to_raymons()
+        + calculate_direct_fabric_sent_to_sagar(),
+        2,
     )
 
 
@@ -470,12 +496,14 @@ def calculate_received_balance() -> float:
 def calculate_shubham_remaining_fabric() -> float:
     total_produced = calculate_total_shubham_fabric_produced()
     sent_to_sai = calculate_processing_fabric_sent_to_sai()
+    sent_to_raymons = calculate_processing_fabric_sent_to_raymons()
     sent_direct = calculate_direct_fabric_sent_to_sagar()
-    return round(total_produced - sent_to_sai - sent_direct, 2)
+    return round(total_produced - sent_to_sai - sent_to_raymons - sent_direct, 2)
 
 
 def get_flow_summary() -> dict[str, dict[str, float]]:
     white_to_sai = calculate_processing_fabric_sent_to_sai()
+    white_to_raymons = calculate_processing_fabric_sent_to_raymons()
     black_to_sagar = calculate_direct_fabric_sent_to_sagar()
     dyed_white = calculate_total_fabric_dyed()
     return {
@@ -485,8 +513,9 @@ def get_flow_summary() -> dict[str, dict[str, float]]:
         },
         "shubham_white": {
             "yarn_balance_kg": calculate_white_yarn_balance(),
-            "fabric_produced_meters": white_to_sai,
+            "fabric_produced_meters": round(white_to_sai + white_to_raymons, 2),
             "fabric_sent_to_sai_meters": white_to_sai,
+            "fabric_sent_to_raymons_meters": white_to_raymons,
         },
         "shubham_black": {
             "yarn_balance_kg": calculate_black_yarn_balance(),
@@ -498,6 +527,7 @@ def get_flow_summary() -> dict[str, dict[str, float]]:
             "fabric_dyed_meters": dyed_white,
             "balance_meters": calculate_fabric_balance(),
         },
+        "raymons": {"white_fabric_received_meters": white_to_raymons},
         "sagar": {
             "white_fabric_received_meters": dyed_white,
             "black_fabric_received_meters": black_to_sagar,
@@ -513,6 +543,7 @@ def get_dashboard() -> dict[str, Any]:
         "white_yarn_with_shubham_kg": calculate_white_yarn_balance(),
         "black_yarn_with_shubham_kg": calculate_black_yarn_balance(),
         "white_fabric_with_sai_meters": calculate_fabric_balance(),
+        "white_fabric_with_raymons_meters": calculate_processing_fabric_sent_to_raymons(),
         "white_fabric_with_sagar_meters": flow_summary["sagar"]["white_fabric_received_meters"],
         "black_fabric_with_sagar_meters": calculate_direct_fabric_sent_to_sagar(),
         "total_fabric_with_sagar_meters": flow_summary["sagar"]["total_fabric_received_meters"],
@@ -577,6 +608,7 @@ def compute_dyeing_balance_map(connection) -> dict[int, float]:
         """
         SELECT id, date, created_at, fabric_produced_meters
         FROM processing_records
+        WHERE destination = 'sai_leela'
         ORDER BY date ASC, created_at ASC, id ASC
         """
     ).fetchall():
@@ -675,23 +707,46 @@ def add_yarn_purchase(payload: dict[str, Any]) -> dict[str, Any]:
 def add_processing_like_record(table_name: str, payload: dict[str, Any]) -> dict[str, Any]:
     yarn_consumed = round(float(payload["yarn_consumed_kg"]), 2)
     wastage = round(yarn_consumed * WASTAGE_RATE, 2)
+    destination = SAI_LEELA_DESTINATION
+    if table_name == "processing_records":
+        destination = str(payload.get("destination", SAI_LEELA_DESTINATION)).strip().lower()
+        if destination not in {SAI_LEELA_DESTINATION, RAYMONS_DESTINATION}:
+            raise ValueError("Choose Sai Leela or Raymons as the fabric destination.")
 
     with get_connection() as connection:
-        cursor = connection.execute(
-            f"""
-            INSERT INTO {table_name}
-            (date, challan_number, yarn_consumed_kg, wastage_kg, fabric_produced_meters, yarn_balance_kg)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
+        if table_name == "processing_records":
+            cursor = connection.execute(
+                """
+                INSERT INTO processing_records
+                (date, challan_number, yarn_consumed_kg, wastage_kg, fabric_produced_meters, destination, yarn_balance_kg)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload["date"],
+                    payload["challan_number"],
+                    yarn_consumed,
+                    wastage,
+                    round(float(payload["fabric_produced_meters"]), 2),
+                    destination,
+                    0,
+                ),
+            )
+        else:
+            cursor = connection.execute(
+                f"""
+                INSERT INTO {table_name}
+                (date, challan_number, yarn_consumed_kg, wastage_kg, fabric_produced_meters, yarn_balance_kg)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
                 payload["date"],
                 payload["challan_number"],
                 yarn_consumed,
                 wastage,
                 round(float(payload["fabric_produced_meters"]), 2),
                 0,
-            ),
-        )
+                ),
+            )
         recompute_processing_balances(connection)
         if table_name == "processing_records":
             recompute_dyeing_balances(connection)
@@ -819,6 +874,13 @@ def update_processing_like_record(
     new_draw = round(yarn_consumed + wastage, 2)
 
     with get_connection() as connection:
+        destination = None
+        if table_name == "processing_records":
+            destination = str(
+                payload.get("destination", existing.get("destination") or SAI_LEELA_DESTINATION)
+            ).strip().lower()
+            if destination not in {SAI_LEELA_DESTINATION, RAYMONS_DESTINATION}:
+                raise ValueError("Choose Sai Leela or Raymons as the fabric destination.")
         yarn_type = WHITE_YARN if table_name == "processing_records" else BLACK_YARN
         total_purchased = fetch_total_yarn_purchased(connection, yarn_type)
         opening_key = INITIAL_WHITE_YARN_KEY if yarn_type == WHITE_YARN else INITIAL_BLACK_YARN_KEY
@@ -836,21 +898,33 @@ def update_processing_like_record(
         # Dyeing balances are recomputed below and may go negative, making
         # the shortfall visible instead of blocking the source correction.
 
-        connection.execute(
-            f"""
-            UPDATE {table_name}
-            SET date = ?, challan_number = ?, yarn_consumed_kg = ?, wastage_kg = ?, fabric_produced_meters = ?
-            WHERE id = ?
-            """,
-            (
-                payload["date"],
-                payload["challan_number"],
-                yarn_consumed,
-                wastage,
-                fabric_produced,
-                record_id,
-            ),
-        )
+        if table_name == "processing_records":
+            connection.execute(
+                """
+                UPDATE processing_records
+                SET date = ?, challan_number = ?, yarn_consumed_kg = ?, wastage_kg = ?,
+                    fabric_produced_meters = ?, destination = ?
+                WHERE id = ?
+                """,
+                (
+                    payload["date"],
+                    payload["challan_number"],
+                    yarn_consumed,
+                    wastage,
+                    fabric_produced,
+                    destination,
+                    record_id,
+                ),
+            )
+        else:
+            connection.execute(
+                f"""
+                UPDATE {table_name}
+                SET date = ?, challan_number = ?, yarn_consumed_kg = ?, wastage_kg = ?, fabric_produced_meters = ?
+                WHERE id = ?
+                """,
+                (payload["date"], payload["challan_number"], yarn_consumed, wastage, fabric_produced, record_id),
+            )
         recompute_processing_balances(connection)
         if table_name == "processing_records":
             recompute_dyeing_balances(connection)
@@ -877,12 +951,19 @@ def delete_processing_like_record(table_name: str, record_id: int) -> None:
 
     with get_connection() as connection:
         if table_name == "processing_records":
-            total_processing = fetch_total_processing_fabric(connection)
+            if existing.get("destination", SAI_LEELA_DESTINATION) == SAI_LEELA_DESTINATION:
+                total_processing = fetch_total_processing_fabric(
+                    connection, destination=SAI_LEELA_DESTINATION
+                )
+            else:
+                total_processing = None
             total_dyed = fetch_total_fabric_dyed(connection)
-            projected_processing = round(
-                total_processing - float(existing["fabric_produced_meters"]), 2
+            projected_processing = (
+                round(total_processing - float(existing["fabric_produced_meters"]), 2)
+                if total_processing is not None
+                else None
             )
-            if projected_processing < total_dyed:
+            if projected_processing is not None and projected_processing < total_dyed:
                 raise ValueError(
                     "Cannot delete this processing record because Sai Leela has already dyed that fabric."
                 )
@@ -911,7 +992,9 @@ def update_dyeing_record(record_id: int, payload: dict[str, Any]) -> dict[str, A
     fabric_dyed = round(float(payload["fabric_dyed_meters"]), 2)
 
     with get_connection() as connection:
-        total_produced = fetch_total_processing_fabric(connection)
+        total_produced = fetch_total_processing_fabric(
+            connection, destination=SAI_LEELA_DESTINATION
+        )
         total_dyed = fetch_total_fabric_dyed(connection)
         projected_dyed = round(total_dyed - float(existing["fabric_dyed_meters"]) + fabric_dyed, 2)
         if projected_dyed > total_produced:

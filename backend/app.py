@@ -370,6 +370,7 @@ def export_pdf():
         "Shubham White Yarn",
         "Shubham Black Yarn",
         "Sai Leela Processors",
+        "Raymons Finishing Mills",
         "Sagar Loom Tex Receipts",
     }
     if selected_tab and selected_tab not in available_tabs:
@@ -424,7 +425,7 @@ def export_pdf():
         story.append(Spacer(1, 12))
 
     if include_tab("Shubham White Yarn"):
-        story.append(Paragraph("2. Shubham White Yarn (To Sai Leela)", section_style))
+        story.append(Paragraph("2. Shubham White Yarn (Sai Leela / Raymons)", section_style))
         append_stock_summary("Shubham White Yarn")
         story.append(
             create_report_table(
@@ -436,6 +437,7 @@ def export_pdf():
                         "Wastage (kg)",
                         "Net Consumed Yarn (kg)",
                         "Fabric Produced (meters)",
+                        "Fabric Sent To",
                     ],
                     report_data["processing_records"],
                     [
@@ -445,16 +447,36 @@ def export_pdf():
                         "wastage_kg",
                         "net_consumed_yarn_kg",
                         "fabric_produced_meters",
+                        "destination_label",
                     ],
                 ),
-                [0.65 * inch, 0.9 * inch, 0.8 * inch, 0.7 * inch, 0.95 * inch, 1.0 * inch],
+                [0.6 * inch, 0.8 * inch, 0.7 * inch, 0.6 * inch, 0.85 * inch, 0.85 * inch, 0.8 * inch],
                 "outgoing",
             )
         )
         story.append(Spacer(1, 12))
 
+    if include_tab("Raymons Finishing Mills"):
+        raymons_rows = [
+            row for row in report_data["processing_records"]
+            if row.get("destination_label") == "Raymons Finishing Mills"
+        ]
+        story.append(Paragraph("3. Raymons Finishing Mills - White Fabric", section_style))
+        story.append(
+            create_report_table(
+                format_table_data(
+                    ["Date", "Challan Number", "Incoming White Fabric (meters)"],
+                    raymons_rows,
+                    ["date", "challan_number", "fabric_produced_meters"],
+                ),
+                [1.0 * inch, 1.5 * inch, 1.8 * inch],
+                "incoming",
+            )
+        )
+        story.append(Spacer(1, 12))
+
     if include_tab("Shubham Black Yarn"):
-        story.append(Paragraph("3. Shubham Black Yarn (Direct To Sagar Loom Tex)", section_style))
+        story.append(Paragraph("4. Shubham Black Yarn (Direct To Sagar Loom Tex)", section_style))
         append_stock_summary("Shubham Black Yarn")
         story.append(
             create_report_table(
@@ -484,7 +506,7 @@ def export_pdf():
         story.append(Spacer(1, 12))
 
     if include_tab("Sai Leela Processors"):
-        story.append(Paragraph("4. Dyeing Records (Sai Leela Processors)", section_style))
+        story.append(Paragraph("5. Dyeing Records (Sai Leela Processors)", section_style))
         append_stock_summary("Sai Leela Processors")
         story.append(
             create_report_table(
@@ -500,7 +522,7 @@ def export_pdf():
         story.append(Spacer(1, 12))
 
     if include_tab("Sagar Loom Tex Receipts"):
-        story.append(Paragraph("5. Fabric Incoming At Sagar Loom Tex", section_style))
+        story.append(Paragraph("6. Fabric Incoming At Sagar Loom Tex", section_style))
         story.append(
             create_report_table(
                 format_table_data(
@@ -584,7 +606,10 @@ def create_processing_record():
     if total_draw > calculate_white_yarn_balance():
         return error("White processing entry exceeds available white yarn balance at Shubham Syncotex.")
 
-    record = add_processing_record(payload)
+    try:
+        record = add_processing_record(payload)
+    except ValueError as exc:
+        return error(str(exc))
     return jsonify(
         {
             "record": record,

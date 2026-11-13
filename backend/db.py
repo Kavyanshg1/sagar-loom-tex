@@ -146,13 +146,21 @@ def migrate_yarn_purchases(connection: sqlite3.Connection) -> None:
     )
 
 
+def migrate_processing_destination(connection: sqlite3.Connection) -> None:
+    columns = get_table_columns(connection, "processing_records")
+    if "destination" not in columns:
+        connection.execute(
+            "ALTER TABLE processing_records ADD COLUMN destination TEXT NOT NULL DEFAULT 'sai_leela'"
+        )
+
+
 def refresh_dyeing_balances(connection: sqlite3.Connection) -> None:
     columns = get_table_columns(connection, "dyeing_records")
     if not {"fabric_dyed_meters", "balance_meters"}.issubset(columns):
         return
 
     total_produced_row = connection.execute(
-        "SELECT COALESCE(SUM(fabric_produced_meters), 0) FROM processing_records"
+        "SELECT COALESCE(SUM(fabric_produced_meters), 0) FROM processing_records WHERE destination = 'sai_leela'"
     ).fetchone()
     total_produced = round(
         get_config_value(connection, "initial_fabric", 0) + float(total_produced_row[0] or 0),
@@ -201,6 +209,7 @@ def init_db() -> None:
         migrate_yarn_purchases(connection)
         migrate_dyeing_records(connection)
         migrate_dyeing_remarks(connection)
+        migrate_processing_destination(connection)
         refresh_dyeing_balances(connection)
         refresh_sagar_receipts(connection)
         connection.commit()
