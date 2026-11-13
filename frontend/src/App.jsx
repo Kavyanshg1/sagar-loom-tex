@@ -481,6 +481,7 @@ export default function App() {
     processing_records: [],
     direct_processing_records: [],
     dyeing_records: [],
+    raymons_dyeing_records: [],
     sagar_receipts: [],
     admin: {
       initial_white_yarn_stock_kg: 0,
@@ -493,6 +494,7 @@ export default function App() {
       white_yarn_with_shubham_kg: 0,
       black_yarn_with_shubham_kg: 0,
       white_fabric_with_sai_meters: 0,
+      white_fabric_with_raymons_meters: 0,
       white_fabric_with_sagar_meters: 0,
       black_fabric_with_sagar_meters: 0,
       total_fabric_with_sagar_meters: 0,
@@ -505,6 +507,7 @@ export default function App() {
           yarn_balance_kg: 0,
           fabric_produced_meters: 0,
           fabric_sent_to_sai_meters: 0,
+          fabric_sent_to_raymons_meters: 0,
         },
         shubham_black: {
           yarn_balance_kg: 0,
@@ -513,6 +516,11 @@ export default function App() {
         },
         sai: {
           fabric_received_meters: 0,
+          fabric_dyed_meters: 0,
+          balance_meters: 0,
+        },
+        raymons: {
+          white_fabric_received_meters: 0,
           fabric_dyed_meters: 0,
           balance_meters: 0,
         },
