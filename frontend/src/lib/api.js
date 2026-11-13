@@ -143,6 +143,13 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  createRaymonsDyeingRecord(payload) {
+    return request("/raymons-dyeing-records", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  },
   uploadDocument(formData) {
     return request("/upload", {
       method: "POST",

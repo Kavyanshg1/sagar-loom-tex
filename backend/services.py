@@ -13,6 +13,7 @@ WASTAGE_RATE = 0.04
 PROCESSING_TABLES = ("processing_records", "direct_processing_records")
 SAI_LEELA_DESTINATION = "sai_leela"
 RAYMONS_DESTINATION = "raymons"
+DYEING_TABLES = ("dyeing_records", "raymons_dyeing_records")
 PASSWORD_KEY = "password_hash"
 INITIAL_WHITE_YARN_KEY = "initial_white_yarn"
 INITIAL_BLACK_YARN_KEY = "initial_black_yarn"
@@ -115,6 +116,28 @@ def get_filtered_records(
         }
         for row in dyeing_rows
     ]
+    with get_connection() as connection:
+        raymons_balance_map = compute_dyeing_balance_map(
+            connection, "raymons_dyeing_records", RAYMONS_DESTINATION
+        )
+        raymons_rows = connection.execute(
+            f"""
+            SELECT id, date, challan_number, fabric_dyed_meters, remarks, balance_meters
+            FROM raymons_dyeing_records{where_clause}
+            ORDER BY date ASC, id ASC
+            """,
+            params,
+        ).fetchall()
+    raymons_dyeing_records = [
+        {
+            "date": row["date"],
+            "challan_number": row["challan_number"],
+            "fabric_dyed_meters": row["fabric_dyed_meters"],
+            "remarks": row["remarks"],
+            "balance_meters": raymons_balance_map.get(row["id"], row["balance_meters"]),
+        }
+        for row in raymons_rows
+    ]
     direct_processing_records = serialize_rows(
         f"""
         SELECT
@@ -143,6 +166,7 @@ def get_filtered_records(
         "yarn_purchases": yarn_purchases,
         "processing_records": processing_records,
         "dyeing_records": dyeing_records,
+        "raymons_dyeing_records": raymons_dyeing_records,
         "direct_processing_records": direct_processing_records,
         "sagar_receipts": sagar_receipts,
     }
@@ -441,6 +465,13 @@ def sync_sagar_receipts(connection) -> None:
     connection.execute(
         """
         INSERT INTO sagar_receipts (source_table, source_record_id, date, challan_number, fabric_type, meters, created_at)
+        SELECT 'raymons_dyeing_records', id, date, challan_number, 'white', fabric_dyed_meters, created_at
+        FROM raymons_dyeing_records
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO sagar_receipts (source_table, source_record_id, date, challan_number, fabric_type, meters, created_at)
         SELECT 'direct_processing_records', id, date, challan_number, 'black', fabric_produced_meters, created_at
         FROM direct_processing_records
         """
@@ -458,6 +489,12 @@ def calculate_total_shubham_fabric_produced() -> float:
 
 def calculate_total_fabric_dyed() -> float:
     return fetch_scalar("SELECT COALESCE(SUM(fabric_dyed_meters), 0) FROM dyeing_records")
+
+
+def calculate_total_raymons_fabric_dyed() -> float:
+    return fetch_scalar(
+        "SELECT COALESCE(SUM(fabric_dyed_meters), 0) FROM raymons_dyeing_records"
+    )
 
 
 def calculate_white_yarn_balance() -> float:
@@ -489,6 +526,14 @@ def calculate_fabric_balance() -> float:
     return round(initial_fabric + produced_for_sai - dyed, 2)
 
 
+def calculate_raymons_fabric_balance() -> float:
+    return round(
+        calculate_processing_fabric_sent_to_raymons()
+        - calculate_total_raymons_fabric_dyed(),
+        2,
+    )
+
+
 def calculate_received_balance() -> float:
     return calculate_fabric_balance()
 
@@ -506,6 +551,7 @@ def get_flow_summary() -> dict[str, dict[str, float]]:
     white_to_raymons = calculate_processing_fabric_sent_to_raymons()
     black_to_sagar = calculate_direct_fabric_sent_to_sagar()
     dyed_white = calculate_total_fabric_dyed()
+    dyed_raymons = calculate_total_raymons_fabric_dyed()
     return {
         "manglam": {
             "white_yarn_purchased_kg": calculate_yarn_purchased_by_type(WHITE_YARN),
@@ -527,9 +573,13 @@ def get_flow_summary() -> dict[str, dict[str, float]]:
             "fabric_dyed_meters": dyed_white,
             "balance_meters": calculate_fabric_balance(),
         },
-        "raymons": {"white_fabric_received_meters": white_to_raymons},
+        "raymons": {
+            "white_fabric_received_meters": white_to_raymons,
+            "fabric_dyed_meters": dyed_raymons,
+            "balance_meters": calculate_raymons_fabric_balance(),
+        },
         "sagar": {
-            "white_fabric_received_meters": dyed_white,
+            "white_fabric_received_meters": round(dyed_white + dyed_raymons, 2),
             "black_fabric_received_meters": black_to_sagar,
             "total_fabric_received_meters": round(dyed_white + black_to_sagar, 2),
         },
@@ -543,7 +593,7 @@ def get_dashboard() -> dict[str, Any]:
         "white_yarn_with_shubham_kg": calculate_white_yarn_balance(),
         "black_yarn_with_shubham_kg": calculate_black_yarn_balance(),
         "white_fabric_with_sai_meters": calculate_fabric_balance(),
-        "white_fabric_with_raymons_meters": calculate_processing_fabric_sent_to_raymons(),
+        "white_fabric_with_raymons_meters": calculate_raymons_fabric_balance(),
         "white_fabric_with_sagar_meters": flow_summary["sagar"]["white_fabric_received_meters"],
         "black_fabric_with_sagar_meters": calculate_direct_fabric_sent_to_sagar(),
         "total_fabric_with_sagar_meters": flow_summary["sagar"]["total_fabric_received_meters"],
@@ -588,18 +638,30 @@ def recompute_processing_balances(connection) -> None:
 
 
 def recompute_dyeing_balances(connection) -> None:
-    balance_map = compute_dyeing_balance_map(connection)
-    rows = connection.execute("SELECT id FROM dyeing_records").fetchall()
-    for row in rows:
-        connection.execute(
-            "UPDATE dyeing_records SET balance_meters = ? WHERE id = ?",
-            (balance_map.get(row["id"], 0.0), row["id"]),
-        )
+    for table_name, destination in (
+        ("dyeing_records", SAI_LEELA_DESTINATION),
+        ("raymons_dyeing_records", RAYMONS_DESTINATION),
+    ):
+        balance_map = compute_dyeing_balance_map(connection, table_name, destination)
+        rows = connection.execute(f"SELECT id FROM {table_name}").fetchall()
+        for row in rows:
+            connection.execute(
+                f"UPDATE {table_name} SET balance_meters = ? WHERE id = ?",
+                (balance_map.get(row["id"], 0.0), row["id"]),
+            )
 
 
-def compute_dyeing_balance_map(connection) -> dict[int, float]:
-    opening_stock = resolve_stock_value(
-        connection, INITIAL_WHITE_FABRIC_KEY, LEGACY_INITIAL_FABRIC_KEY
+def compute_dyeing_balance_map(
+    connection,
+    table_name: str = "dyeing_records",
+    destination: str = SAI_LEELA_DESTINATION,
+) -> dict[int, float]:
+    if table_name not in DYEING_TABLES:
+        raise ValueError("Unsupported dyeing table.")
+    opening_stock = (
+        resolve_stock_value(connection, INITIAL_WHITE_FABRIC_KEY, LEGACY_INITIAL_FABRIC_KEY)
+        if destination == SAI_LEELA_DESTINATION
+        else 0.0
     )
 
     events: list[tuple[str, str, int, int, float]] = []
@@ -608,9 +670,10 @@ def compute_dyeing_balance_map(connection) -> dict[int, float]:
         """
         SELECT id, date, created_at, fabric_produced_meters
         FROM processing_records
-        WHERE destination = 'sai_leela'
+        WHERE destination = ?
         ORDER BY date ASC, created_at ASC, id ASC
-        """
+        """,
+        (destination,),
     ).fetchall():
         events.append(
             (
@@ -623,9 +686,9 @@ def compute_dyeing_balance_map(connection) -> dict[int, float]:
         )
 
     for row in connection.execute(
-        """
+        f"""
         SELECT id, date, created_at, fabric_dyed_meters
-        FROM dyeing_records
+        FROM {table_name}
         ORDER BY date ASC, created_at ASC, id ASC
         """
     ).fetchall():
@@ -654,13 +717,18 @@ def compute_dyeing_balance_map(connection) -> dict[int, float]:
     return balance_map
 
 
-def serialize_dyeing_records() -> list[dict[str, Any]]:
+def serialize_dyeing_records(table_name: str = "dyeing_records") -> list[dict[str, Any]]:
+    if table_name not in DYEING_TABLES:
+        raise ValueError("Unsupported dyeing table.")
+    destination = (
+        SAI_LEELA_DESTINATION if table_name == "dyeing_records" else RAYMONS_DESTINATION
+    )
     with get_connection() as connection:
-        balance_map = compute_dyeing_balance_map(connection)
+        balance_map = compute_dyeing_balance_map(connection, table_name, destination)
         rows = connection.execute(
-            """
+            f"""
             SELECT id, date, challan_number, fabric_dyed_meters, remarks, balance_meters, created_at
-            FROM dyeing_records
+            FROM {table_name}
             ORDER BY created_at DESC, id DESC
             """
         ).fetchall()
@@ -766,13 +834,17 @@ def add_direct_processing_record(payload: dict[str, Any]) -> dict[str, Any]:
     return add_processing_like_record("direct_processing_records", payload)
 
 
-def add_dyeing_record(payload: dict[str, Any]) -> dict[str, Any]:
+def add_dyeing_record(
+    payload: dict[str, Any], table_name: str = "dyeing_records"
+) -> dict[str, Any]:
+    if table_name not in DYEING_TABLES:
+        raise ValueError("Unsupported dyeing table.")
     fabric_dyed = round(float(payload["fabric_dyed_meters"]), 2)
 
     with get_connection() as connection:
         cursor = connection.execute(
-            """
-            INSERT INTO dyeing_records
+            f"""
+            INSERT INTO {table_name}
             (date, challan_number, fabric_dyed_meters, remarks, balance_meters)
             VALUES (?, ?, ?, ?, ?)
             """,
@@ -951,21 +1023,26 @@ def delete_processing_like_record(table_name: str, record_id: int) -> None:
 
     with get_connection() as connection:
         if table_name == "processing_records":
-            if existing.get("destination", SAI_LEELA_DESTINATION) == SAI_LEELA_DESTINATION:
-                total_processing = fetch_total_processing_fabric(
-                    connection, destination=SAI_LEELA_DESTINATION
-                )
-            else:
-                total_processing = None
-            total_dyed = fetch_total_fabric_dyed(connection)
-            projected_processing = (
-                round(total_processing - float(existing["fabric_produced_meters"]), 2)
-                if total_processing is not None
-                else None
+            destination = existing.get("destination", SAI_LEELA_DESTINATION)
+            dyeing_table = (
+                "raymons_dyeing_records"
+                if destination == RAYMONS_DESTINATION
+                else "dyeing_records"
             )
-            if projected_processing is not None and projected_processing < total_dyed:
+            total_processing = fetch_total_processing_fabric(
+                connection, destination=destination
+            )
+            total_dyed_row = connection.execute(
+                f"SELECT COALESCE(SUM(fabric_dyed_meters), 0) FROM {dyeing_table}"
+            ).fetchone()
+            total_dyed = round(float(total_dyed_row[0] or 0), 2)
+            projected_processing = round(
+                total_processing - float(existing["fabric_produced_meters"]), 2
+            )
+            if projected_processing < total_dyed:
+                location = "Raymons Finishing Mills" if destination == RAYMONS_DESTINATION else "Sai Leela"
                 raise ValueError(
-                    "Cannot delete this processing record because Sai Leela has already dyed that fabric."
+                    f"Cannot delete this processing record because {location} has already dyed that fabric."
                 )
 
         connection.execute(f"DELETE FROM {table_name} WHERE id = ?", (record_id,))
@@ -984,25 +1061,33 @@ def delete_direct_processing_record(record_id: int) -> None:
     delete_processing_like_record("direct_processing_records", record_id)
 
 
-def update_dyeing_record(record_id: int, payload: dict[str, Any]) -> dict[str, Any]:
-    existing = fetch_record_by_id("dyeing_records", record_id)
+def update_dyeing_record(
+    record_id: int, payload: dict[str, Any], table_name: str = "dyeing_records"
+) -> dict[str, Any]:
+    if table_name not in DYEING_TABLES:
+        raise ValueError("Unsupported dyeing table.")
+    existing = fetch_record_by_id(table_name, record_id)
     if not existing:
         raise ValueError("Record not found.")
 
     fabric_dyed = round(float(payload["fabric_dyed_meters"]), 2)
 
     with get_connection() as connection:
-        total_produced = fetch_total_processing_fabric(
-            connection, destination=SAI_LEELA_DESTINATION
+        destination = (
+            SAI_LEELA_DESTINATION if table_name == "dyeing_records" else RAYMONS_DESTINATION
         )
-        total_dyed = fetch_total_fabric_dyed(connection)
+        total_produced = fetch_total_processing_fabric(connection, destination=destination)
+        total_dyed = fetch_scalar(
+            f"SELECT COALESCE(SUM(fabric_dyed_meters), 0) FROM {table_name}"
+        )
         projected_dyed = round(total_dyed - float(existing["fabric_dyed_meters"]) + fabric_dyed, 2)
         if projected_dyed > total_produced:
-            raise ValueError("Updated dyeing record exceeds available unfinished fabric at Sai Leela Processors.")
+            location = "Sai Leela Processors" if destination == SAI_LEELA_DESTINATION else "Raymons Finishing Mills"
+            raise ValueError(f"Updated dyeing record exceeds available fabric at {location}.")
 
         connection.execute(
-            """
-            UPDATE dyeing_records
+            f"""
+            UPDATE {table_name}
             SET date = ?, challan_number = ?, fabric_dyed_meters = ?, remarks = ?
             WHERE id = ?
             """,
@@ -1018,18 +1103,20 @@ def update_dyeing_record(record_id: int, payload: dict[str, Any]) -> dict[str, A
         sync_sagar_receipts(connection)
         connection.commit()
         record = connection.execute(
-            "SELECT * FROM dyeing_records WHERE id = ?", (record_id,)
+            f"SELECT * FROM {table_name} WHERE id = ?", (record_id,)
         ).fetchone()
     return dict(record)
 
 
-def delete_dyeing_record(record_id: int) -> None:
-    existing = fetch_record_by_id("dyeing_records", record_id)
+def delete_dyeing_record(record_id: int, table_name: str = "dyeing_records") -> None:
+    if table_name not in DYEING_TABLES:
+        raise ValueError("Unsupported dyeing table.")
+    existing = fetch_record_by_id(table_name, record_id)
     if not existing:
         raise ValueError("Record not found.")
 
     with get_connection() as connection:
-        connection.execute("DELETE FROM dyeing_records WHERE id = ?", (record_id,))
+        connection.execute(f"DELETE FROM {table_name} WHERE id = ?", (record_id,))
         recompute_dyeing_balances(connection)
         sync_sagar_receipts(connection)
         connection.commit()
@@ -1059,6 +1146,7 @@ def clear_all_data() -> None:
     with get_connection() as connection:
         for table_name in (
             "sagar_receipts",
+            "raymons_dyeing_records",
             "dyeing_records",
             "processing_records",
             "direct_processing_records",

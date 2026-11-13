@@ -184,6 +184,39 @@ def refresh_dyeing_balances(connection: sqlite3.Connection) -> None:
             (balance, row["id"]),
         )
 
+    events = []
+    for row in connection.execute(
+        """
+        SELECT id, date, created_at, fabric_produced_meters AS meters, 0 AS event_type
+        FROM processing_records
+        WHERE destination = 'raymons'
+        UNION ALL
+        SELECT id, date, created_at, fabric_dyed_meters AS meters, 1 AS event_type
+        FROM raymons_dyeing_records
+        """
+    ).fetchall():
+        events.append(row)
+
+    events.sort(
+        key=lambda row: (
+            str(row["date"] or ""),
+            str(row["created_at"] or ""),
+            int(row["event_type"]),
+            int(row["id"]),
+        )
+    )
+    raymons_balance = 0.0
+    for event in events:
+        amount = round(float(event["meters"] or 0), 2)
+        if event["event_type"] == 0:
+            raymons_balance = round(raymons_balance + amount, 2)
+        else:
+            raymons_balance = round(raymons_balance - amount, 2)
+            connection.execute(
+                "UPDATE raymons_dyeing_records SET balance_meters = ? WHERE id = ?",
+                (raymons_balance, event["id"]),
+            )
+
 
 def refresh_sagar_receipts(connection: sqlite3.Connection) -> None:
     connection.execute("DELETE FROM sagar_receipts")
@@ -192,6 +225,13 @@ def refresh_sagar_receipts(connection: sqlite3.Connection) -> None:
         INSERT INTO sagar_receipts (source_table, source_record_id, date, challan_number, fabric_type, meters, created_at)
         SELECT 'dyeing_records', id, date, challan_number, 'white', fabric_dyed_meters, created_at
         FROM dyeing_records
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO sagar_receipts (source_table, source_record_id, date, challan_number, fabric_type, meters, created_at)
+        SELECT 'raymons_dyeing_records', id, date, challan_number, 'white', fabric_dyed_meters, created_at
+        FROM raymons_dyeing_records
         """
     )
     connection.execute(

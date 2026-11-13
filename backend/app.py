@@ -33,6 +33,7 @@ from services import (
     add_processing_record,
     add_yarn_purchase,
     calculate_fabric_balance,
+    calculate_raymons_fabric_balance,
     calculate_black_yarn_balance,
     calculate_white_yarn_balance,
     calculate_yarn_balance,
@@ -279,6 +280,7 @@ def records():
                 "SELECT * FROM direct_processing_records ORDER BY created_at DESC, id DESC"
             ),
             "dyeing_records": serialize_dyeing_records(),
+            "raymons_dyeing_records": serialize_dyeing_records("raymons_dyeing_records"),
             "sagar_receipts": serialize_rows(
                 """
                 SELECT id, date, challan_number, fabric_type, meters, source_table, source_record_id, created_at
@@ -471,6 +473,18 @@ def export_pdf():
                 ),
                 [1.0 * inch, 1.5 * inch, 1.8 * inch],
                 "incoming",
+            )
+        )
+        story.append(Spacer(1, 8))
+        story.append(
+            create_report_table(
+                format_table_data(
+                    ["Date", "Challan Number", "Fabric Dyed / Sent To Sagar (meters)", "Remarks"],
+                    report_data["raymons_dyeing_records"],
+                    ["date", "challan_number", "fabric_dyed_meters", "remarks"],
+                ),
+                [0.9 * inch, 1.2 * inch, 1.7 * inch, 2.0 * inch],
+                "outgoing",
             )
         )
         story.append(Spacer(1, 12))
@@ -773,6 +787,58 @@ def edit_dyeing_record(record_id: int):
 def remove_dyeing_record(record_id: int):
     try:
         delete_dyeing_record(record_id)
+    except ValueError as exc:
+        status_code = 404 if str(exc) == "Record not found." else 400
+        return error(str(exc), status_code)
+
+    return jsonify({"success": True, "dashboard": get_dashboard()})
+
+
+@app.post("/raymons-dyeing-records")
+@auth_required()
+def create_raymons_dyeing_record():
+    payload = request.get_json(force=True, silent=True) or {}
+    validation_error = required_fields(
+        payload, ["date", "challan_number", "fabric_dyed_meters"]
+    )
+    if validation_error:
+        return error(validation_error)
+
+    try:
+        fabric_dyed = float(payload["fabric_dyed_meters"])
+    except (TypeError, ValueError):
+        return error("Fabric dyed must be a number.")
+    if fabric_dyed > calculate_raymons_fabric_balance():
+        return error("Dyeing entry exceeds available fabric balance at Raymons Finishing Mills.")
+
+    record = add_dyeing_record(payload, "raymons_dyeing_records")
+    return jsonify({"record": record, "dashboard": get_dashboard()}), 201
+
+
+@app.put("/raymons-dyeing-records/<int:record_id>")
+@auth_required()
+def edit_raymons_dyeing_record(record_id: int):
+    payload = request.get_json(force=True, silent=True) or {}
+    validation_error = required_fields(
+        payload, ["date", "challan_number", "fabric_dyed_meters"]
+    )
+    if validation_error:
+        return error(validation_error)
+
+    try:
+        record = update_dyeing_record(record_id, payload, "raymons_dyeing_records")
+    except ValueError as exc:
+        status_code = 404 if str(exc) == "Record not found." else 400
+        return error(str(exc), status_code)
+
+    return jsonify({"record": record, "dashboard": get_dashboard()})
+
+
+@app.delete("/raymons-dyeing-records/<int:record_id>")
+@auth_required()
+def remove_raymons_dyeing_record(record_id: int):
+    try:
+        delete_dyeing_record(record_id, "raymons_dyeing_records")
     except ValueError as exc:
         status_code = 404 if str(exc) == "Record not found." else 400
         return error(str(exc), status_code)

@@ -200,18 +200,21 @@ const config = {
   },
   "Raymons Finishing Mills": {
     title: "Raymons Finishing Mills - White Fabric",
-    recordsKey: "processing_records",
+    endpoint: "createRaymonsDyeingRecord",
+    resourcePath: "/raymons-dyeing-records",
+    recordsKey: "raymons_dyeing_records",
+    documentType: "dyeing",
+    uploadTitle: "Raymons Finishing Challan OCR Preview",
     searchKey: "challan_number",
-    summaryLabel: "White fabric received",
-    readOnly: true,
-    readOnlyDescription: "White fabric routed to Raymons from Shubham White Yarn appears here automatically.",
-    tableColumns: [
-      { key: "date", label: "Date" },
-      { key: "flow_direction", label: "Flow" },
-      { key: "reference_number", label: "Challan #" },
-      { key: "incoming_meters", label: "Incoming White Fabric (m)" },
+    summaryLabel: "Fabric balance",
+    fields: [
+      { name: "date", label: "Date", type: "date" },
+      { name: "challan_number", label: "Challan Number" },
+      { name: "fabric_dyed_meters", label: "Fabric Dyed (m)", type: "number" },
+      { name: "remarks", label: "Remarks (Shade Number - Meters)" },
     ],
-    emptyMessage: "No white fabric has been routed to Raymons yet.",
+    tableColumns: saiLedgerColumns,
+    emptyMessage: "No fabric entries yet. Incoming Shubham records and Raymons outgoing entries appear here.",
   },
 };
 
@@ -251,6 +254,12 @@ function createDefaultValues() {
       yarn_balance_kg: "",
     },
     "Sai Leela Processors": {
+      date: today,
+      challan_number: "",
+      fabric_dyed_meters: "",
+      remarks: "",
+    },
+    "Raymons Finishing Mills": {
       date: today,
       challan_number: "",
       fabric_dyed_meters: "",
@@ -734,22 +743,59 @@ export default function App() {
         flow_direction: row.fabric_type === "white" ? "Incoming White" : "Incoming Black",
         reference_number: row.challan_number,
         incoming_meters: row.meters,
-        notes: row.fabric_type === "white" ? "From Sai Leela" : "Direct from Shubham",
+        notes:
+          row.source_table === "raymons_dyeing_records"
+            ? "From Raymons Finishing Mills"
+            : row.fabric_type === "white"
+              ? "From Sai Leela"
+              : "Direct from Shubham",
         search_blob: [row.challan_number, row.fabric_type].join(" ").toLowerCase(),
       })),
-      "Raymons Finishing Mills": (records.processing_records ?? [])
-        .filter((row) => row.destination === "raymons")
-        .map((row) => ({
-          ...row,
-          rowKey: `raymons-${row.id}`,
-          editable: false,
-          date: row.date,
-          created_at: row.created_at ?? "",
-          flow_direction: "Incoming",
-          reference_number: row.challan_number,
-          incoming_meters: row.fabric_produced_meters,
-          search_blob: [row.challan_number].join(" ").toLowerCase(),
-        })),
+      "Raymons Finishing Mills": (() => {
+        const timeline = [
+          ...(records.processing_records ?? [])
+            .filter((row) => row.destination === "raymons")
+            .map((row) => ({
+              ...row,
+              rowKey: `raymons-in-${row.id}`,
+              editable: false,
+              event_priority: 0,
+              flow_direction: "Incoming",
+              reference_number: row.challan_number,
+              amount_meters: Number(row.fabric_produced_meters || 0),
+              incoming_meters: row.fabric_produced_meters,
+              outgoing_meters: "",
+              remarks: "From Shubham White Yarn",
+              search_blob: [row.challan_number].join(" ").toLowerCase(),
+            })),
+          ...(records.raymons_dyeing_records ?? []).map((row) => ({
+            ...row,
+            rowKey: `raymons-out-${row.id}`,
+            editable: true,
+            event_priority: 1,
+            flow_direction: "Outgoing",
+            reference_number: row.challan_number,
+            amount_meters: Number(row.fabric_dyed_meters || 0),
+            incoming_meters: "",
+            outgoing_meters: row.fabric_dyed_meters,
+            remarks: row.remarks,
+            search_blob: [row.challan_number, row.remarks].join(" ").toLowerCase(),
+          })),
+        ].sort((left, right) =>
+          left.date.localeCompare(right.date) ||
+          String(left.created_at ?? "").localeCompare(String(right.created_at ?? "")) ||
+          left.event_priority - right.event_priority ||
+          left.id - right.id,
+        );
+
+        let runningBalance = 0;
+        return timeline.map((row) => {
+          runningBalance = roundToTwo(
+            runningBalance + (row.flow_direction === "Incoming" ? row.amount_meters : -row.amount_meters),
+          );
+          return { ...row, balance_meters: runningBalance };
+        });
+      })(),
     };
 
     return sortRowsByDate(
@@ -1322,9 +1368,9 @@ export default function App() {
     "Sai Leela Processors":
       "Track incoming white fabric from Shubham separately from outgoing dyed fabric sent onward, with remarks in shade-number format.",
     "Sagar Loom Tex Receipts":
-      "Sagar now shows separate incoming white and incoming black receipt tables so both branches remain independently auditable.",
+      "White fabric arrives from Sai Leela and Raymons finishing; black fabric arrives directly from Shubham.",
     "Raymons Finishing Mills":
-      "White fabric entries routed to Raymons from Shubham appear here automatically.",
+      "Incoming white fabric from Shubham appears automatically. Add each outgoing dyed challan here to send it to Sagar.",
   };
 
   const flowSummary = records.dashboard.flow_summary;
@@ -1350,6 +1396,13 @@ export default function App() {
       openingValue: records.dashboard.initial_white_fabric_stock_meters,
       currentValue: records.dashboard.white_fabric_with_sai_meters,
     },
+    "Raymons Finishing Mills": {
+      unit: "m",
+      openingLabel: "Opening Stock",
+      currentLabel: "Current Stock",
+      openingValue: 0,
+      currentValue: records.dashboard.white_fabric_with_raymons_meters,
+    },
   };
 
   const currentStockSummary = stockSummaryByTab[activeTab] ?? null;
@@ -1374,6 +1427,11 @@ export default function App() {
       `White fabric received: ${formatMetric(flowSummary.sai.fabric_received_meters, "m")}`,
       `White fabric dyed: ${formatMetric(flowSummary.sai.fabric_dyed_meters, "m")}`,
       `White fabric balance: ${formatMetric(flowSummary.sai.balance_meters, "m")}`,
+    ],
+    raymons: [
+      `White fabric received: ${formatMetric(flowSummary.raymons.white_fabric_received_meters, "m")}`,
+      `White fabric sent to Sagar: ${formatMetric(flowSummary.raymons.fabric_dyed_meters, "m")}`,
+      `White fabric balance: ${formatMetric(flowSummary.raymons.balance_meters, "m")}`,
     ],
     sagar: [
       `White fabric received from Sai: ${formatMetric(flowSummary.sagar.white_fabric_received_meters, "m")}`,
@@ -1503,7 +1561,7 @@ export default function App() {
           <StatCard
             label="Raymons White Fabric"
             value={formatMetric(records.dashboard.white_fabric_with_raymons_meters, "m")}
-            subtitle="White fabric routed from Shubham to Raymons Finishing Mills."
+            subtitle="White fabric available at Raymons after outgoing finished-fabric entries."
             accent="bg-amber-500/20 text-amber-100"
           />
           <StatCard
@@ -1645,7 +1703,7 @@ export default function App() {
                         : activeTab === "Sai Leela Processors"
                           ? formatMetric(flowSummary.sai.balance_meters, "m")
                           : activeTab === "Raymons Finishing Mills"
-                            ? formatMetric(flowSummary.raymons.white_fabric_received_meters, "m")
+                            ? formatMetric(flowSummary.raymons.balance_meters, "m")
                           : formatMetric(flowSummary.sagar.total_fabric_received_meters, "m")}
                 </span>
               </div>

@@ -41,6 +41,16 @@ CREATE TABLE IF NOT EXISTS dyeing_records (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS raymons_dyeing_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    challan_number TEXT NOT NULL,
+    fabric_dyed_meters REAL NOT NULL,
+    remarks TEXT NOT NULL DEFAULT '',
+    balance_meters REAL NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS sagar_receipts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_table TEXT NOT NULL,
